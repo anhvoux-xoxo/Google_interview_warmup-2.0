@@ -1,0 +1,8 @@
+{
+  "name": "Googlewarmup_Update",
+  "description": "A modern interview preparation application featuring practice questions, video/audio recording, and AI-powered feedback.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
