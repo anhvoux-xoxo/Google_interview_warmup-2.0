@@ -1,48 +1,45 @@
 import React from 'react';
-import { View } from '../types';
-import { Layout, Video, Mic } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { playHoverSound } from '../utils/sound';
 
 interface NavbarProps {
-  currentView: View;
-  onNavigate: (view: View) => void;
+  onBack: () => void;
+  onForward: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
-  const navItems = [
-    { label: 'Home', view: View.HOME, icon: <Layout className="w-4 h-4 mr-2" /> },
-    { label: 'Practice', view: View.PRACTICE, icon: <Video className="w-4 h-4 mr-2" /> },
-    { label: 'Recordings', view: View.RECORDINGS, icon: <Mic className="w-4 h-4 mr-2" /> },
-  ];
-
+export const Navbar: React.FC<NavbarProps> = ({ onBack, onForward, canGoBack, canGoForward }) => {
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center cursor-pointer" onClick={() => onNavigate(View.HOME)}>
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-2">
-              <div className="w-4 h-4 border-2 border-white rounded-sm"></div>
-            </div>
-            <span className="font-bold text-xl tracking-tight text-slate-900">SimplePrep</span>
-          </div>
-          
-          <div className="flex space-x-1">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => onNavigate(item.view)}
-                className={`
-                  flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                  ${currentView === item.view 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
-                `}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+    <nav className="sticky top-0 z-50 bg-white h-20 flex items-center border-b border-slate-100/50">
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+        <button 
+          onClick={onBack} 
+          onMouseEnter={playHoverSound}
+          disabled={!canGoBack}
+          className={`
+            w-12 h-12 flex items-center justify-center rounded-[25%] transition-all duration-200 text-black
+            ${canGoBack 
+              ? 'bg-[#D9D9D9]/30 hover:bg-[#D9D9D9]/60 cursor-pointer' 
+              : 'bg-[#D9D9D9]/10 cursor-default opacity-50'}
+          `}
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        
+        <button 
+          onClick={onForward}
+          onMouseEnter={playHoverSound}
+          disabled={!canGoForward}
+          className={`
+            w-12 h-12 flex items-center justify-center rounded-[25%] transition-all duration-200 text-black
+            ${canGoForward 
+              ? 'bg-[#D9D9D9]/30 hover:bg-[#D9D9D9]/60 cursor-pointer' 
+              : 'bg-[#D9D9D9]/10 cursor-default opacity-50'}
+          `}
+        >
+          <ArrowRight className="w-6 h-6" />
+        </button>
       </div>
     </nav>
   );

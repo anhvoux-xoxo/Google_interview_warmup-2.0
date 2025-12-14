@@ -1,24 +1,24 @@
 export enum View {
-  HOME = 'HOME',
-  PRACTICE = 'PRACTICE',
-  RECORDINGS = 'RECORDINGS',
+  FIELD_SELECTION = 'FIELD_SELECTION',
+  ALL_QUESTIONS = 'ALL_QUESTIONS',
+  QUESTION_FLOW = 'QUESTION_FLOW',
+  CUSTOM_DESCRIPTION = 'CUSTOM_DESCRIPTION',
+  CUSTOM_ADD = 'CUSTOM_ADD',
 }
 
 export enum QuestionCategory {
   UX_DESIGN = 'UX Design',
+  ENGINEERING = 'Engineering',
   DATA_ANALYTICS = 'Data Analytics',
-  PROJECT_MANAGEMENT = 'Project Management',
-  DIGITAL_MARKETING = 'Digital Marketing',
-  IT_SUPPORT = 'IT Support',
   CYBERSECURITY = 'Cybersecurity',
-  GENERAL = 'General',
+  CUSTOM = 'Custom field of your practice here',
 }
 
 export interface Question {
   id: string;
   text: string;
   category: QuestionCategory;
-  type: 'Background' | 'Situational' | 'Technical';
+  type: 'Background' | 'Situational' | 'Technical' | 'Custom question';
 }
 
 export interface Recording {

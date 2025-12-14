@@ -32,3 +32,49 @@ export const getAiSuggestion = async (question: string): Promise<string> => {
     return "Unable to connect to AI service. Please try again later.";
   }
 };
+
+export const generateQuestions = async (jobDescription: string): Promise<string[]> => {
+  if (!apiKey) {
+    console.warn("API Key missing, returning mock questions");
+    return [
+      "Tell me about a time you handled a difficult stakeholder.",
+      "How do you prioritize your tasks?",
+      "Describe a project where you had to learn a new technology.",
+      "What is your greatest professional achievement?",
+      "How do you handle feedback?"
+    ];
+  }
+
+  try {
+    const prompt = `
+      Based on the following job description, generate exactly 5 interview questions.
+      Return ONLY a JSON array of strings. Do not include markdown formatting or "json" tags.
+      
+      Job Description: "${jobDescription}"
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const text = response.text;
+    if (!text) return [];
+    
+    // Parse the JSON array
+    const questions = JSON.parse(text);
+    return Array.isArray(questions) ? questions : [];
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return [
+      "Can you describe your relevant experience?",
+      "Why are you interested in this role?",
+      "How do you deal with pressure?",
+      "What are your technical strengths?",
+      "Where do you see yourself in 5 years?"
+    ];
+  }
+};
