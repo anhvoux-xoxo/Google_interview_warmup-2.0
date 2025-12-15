@@ -1,6 +1,6 @@
 {
-  "name": "Googlewarmup_Update",
-  "description": "A modern interview preparation application featuring practice questions, video/audio recording, and AI-powered feedback.",
+  "name": "Interview_warmup 2.0",
+  "description": "Redesign and Updated more functions for Google Warmup tool",
   "requestFramePermissions": [
     "camera",
     "microphone"

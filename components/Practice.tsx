@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QuestionCategory, Question } from '../types';
 import { Info } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
@@ -10,7 +10,13 @@ interface PracticeProps {
 }
 
 export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelectQuestion }) => {
+  const [activeFilter, setActiveFilter] = useState('All');
   const filters = ['All', 'Background', 'Situational', 'Technical', 'Custom question'];
+
+  const filteredQuestions = questions.filter(q => {
+    if (activeFilter === 'All') return true;
+    return q.type === activeFilter;
+  });
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -21,30 +27,33 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
       </div>
 
       <div className="flex flex-wrap justify-center gap-3 mb-12">
-        {filters.map((filter, idx) => (
-          <button 
-            key={filter}
-            onMouseEnter={playHoverSound}
-            className={`
-              px-5 py-2 rounded-full text-sm font-medium transition-colors border
-              ${idx === 0 
-                ? 'bg-blue-600 text-black border-blue-600' 
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}
-            `}
-            style={idx === 0 ? { color: 'black' } : {}}
-          >
-            {filter} 
-            {idx === 0 && (
-                <span className="ml-2 bg-white text-black px-1.5 py-0.5 rounded-full text-xs font-bold">
-                    50
-                </span>
-            )}
-          </button>
-        ))}
+        {filters.map((filter) => {
+          const isActive = activeFilter === filter;
+          return (
+            <button 
+              key={filter}
+              onMouseEnter={playHoverSound}
+              onClick={() => setActiveFilter(filter)}
+              className={`
+                px-5 py-2 rounded-full text-sm font-medium transition-colors border
+                ${isActive
+                  ? 'bg-blue-600 text-white border-blue-600' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}
+              `}
+            >
+              {filter} 
+              {filter === 'All' && (
+                  <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                      {questions.length}
+                  </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {questions.map((q) => (
+        {filteredQuestions.map((q) => (
           <div 
             key={q.id}
             onMouseEnter={playHoverSound}
@@ -67,6 +76,12 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
             </h3>
           </div>
         ))}
+        
+        {filteredQuestions.length === 0 && (
+           <div className="col-span-full py-12 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-200 rounded-2xl">
+              <p>No questions found for the "{activeFilter}" filter.</p>
+           </div>
+        )}
       </div>
     </div>
   );
