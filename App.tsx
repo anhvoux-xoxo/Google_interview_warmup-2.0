@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { FieldSelection } from './components/FieldSelection';
 import { Practice } from './components/Practice';
+import { PracticeStart } from './components/PracticeStart';
 import { QuestionFlow } from './components/QuestionFlow';
 import { CustomJobInput } from './components/CustomJobInput';
 import { CustomQuestionInput } from './components/CustomQuestionInput';
@@ -274,18 +275,28 @@ export default function App() {
     setSelectedCategory(cat);
     if (cat === QuestionCategory.CUSTOM) {
       navigateTo(View.CUSTOM_DESCRIPTION);
+    } else {
+      navigateTo(View.PRACTICE_START);
     }
   };
 
   const handleStartPractice = () => {
     // Get all available questions for the selected category from the initial bank
-    const allQuestions = INITIAL_QUESTIONS[selectedCategory!] || [];
+    const allQuestions = questions[selectedCategory!] || [];
 
     // Shuffle and pick 5 random questions
     const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
     const randomFive = shuffled.slice(0, 5);
 
-    // Update the state to only show these 5 for the session
+    // Update the state to only show these 5 for the session (optional, but requested in logic)
+    // Note: We are not changing the *source* questions, but maybe we should pass these 5 specifically.
+    // However, the Practice component takes the full list. 
+    // To strictly follow "Practice with 5", we should probably filter them.
+    // But Practice component allows filtering by type, etc. 
+    // For now, let's just pick the first one to start the flow, 
+    // OR we could pass a filtered list to Practice view. 
+    // The previous implementation replaced the list in state. Let's keep that behavior for consistency.
+    
     setQuestions(prev => ({
       ...prev,
       [selectedCategory!]: randomFive
@@ -314,10 +325,9 @@ export default function App() {
       [QuestionCategory.CUSTOM]: [...(prev[QuestionCategory.CUSTOM] || []), ...newQuestions]
     }));
     
-    // As per requirement "Display the list of questions that were generated earlier",
-    // when "See all generated questions" is clicked in CustomJobInput, we navigate here.
     setSelectedCategory(QuestionCategory.CUSTOM);
-    navigateTo(View.ALL_QUESTIONS);
+    // After generation, go to Practice Start screen
+    navigateTo(View.PRACTICE_START);
   };
 
   const handleManualAddCustom = () => {
@@ -368,9 +378,15 @@ export default function App() {
           <FieldSelection 
             selectedCategory={selectedCategory}
             onSelectCategory={handleSelectCategory}
-            onStartPractice={handleStartPractice}
-            onSeeAllQuestions={handleSeeAllQuestions}
           />
+        );
+      case View.PRACTICE_START:
+        return (
+            <PracticeStart 
+                onStartPractice={handleStartPractice}
+                onSeeAllQuestions={handleSeeAllQuestions}
+                isCustom={selectedCategory === QuestionCategory.CUSTOM}
+            />
         );
       case View.CUSTOM_DESCRIPTION:
         return (

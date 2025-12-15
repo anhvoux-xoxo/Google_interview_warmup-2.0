@@ -4,6 +4,7 @@ export enum View {
   QUESTION_FLOW = 'QUESTION_FLOW',
   CUSTOM_DESCRIPTION = 'CUSTOM_DESCRIPTION',
   CUSTOM_ADD = 'CUSTOM_ADD',
+  PRACTICE_START = 'PRACTICE_START',
 }
 
 export enum QuestionCategory {

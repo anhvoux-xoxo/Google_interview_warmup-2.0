@@ -11,7 +11,6 @@ interface CustomJobInputProps {
 export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManualAdd }) => {
   const [description, setDescription] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
 
   const handleStart = async () => {
     if (!description.trim()) return;
@@ -19,11 +18,9 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
     setIsGenerating(true);
     const questions = await generateQuestions(description);
     setIsGenerating(false);
-    setGeneratedQuestions(questions);
-  };
-
-  const handleSeeGenerated = () => {
-    onStart(description, generatedQuestions);
+    
+    // Immediately navigate to the Practice Start screen with the generated questions
+    onStart(description, questions);
   };
 
   return (
@@ -62,33 +59,18 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
         </button>
       </div>
 
-      {!generatedQuestions.length ? (
-        <button
-          onMouseEnter={playHoverSound}
-          onClick={onManualAdd}
-          className="w-full max-w-md px-6 py-4 text-slate-800 font-semibold text-base rounded-[20px] transition-all bg-white hover:shadow-md border border-transparent"
-          style={{ backgroundColor: 'rgba(255,255,255,0.34)' }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.34)')}
-          onMouseDown={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,1)')}
-          onMouseUp={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
-        >
-          Manually add your questions here
-        </button>
-      ) : (
-        <button
-          onMouseEnter={playHoverSound}
-          onClick={handleSeeGenerated}
-          className="w-full max-w-md px-6 py-4 text-slate-800 font-semibold text-base rounded-[20px] transition-all bg-white hover:shadow-md border border-transparent"
-          style={{ backgroundColor: 'rgba(255,255,255,0.34)' }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.34)')}
-          onMouseDown={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,1)')}
-          onMouseUp={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
-        >
-          See all the generated questions
-        </button>
-      )}
+      <button
+        onMouseEnter={playHoverSound}
+        onClick={onManualAdd}
+        className="w-full max-w-md px-6 py-4 text-slate-800 font-semibold text-base rounded-[20px] transition-all bg-white hover:shadow-md border border-transparent"
+        style={{ backgroundColor: 'rgba(255,255,255,0.34)' }}
+        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
+        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.34)')}
+        onMouseDown={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,1)')}
+        onMouseUp={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
+      >
+        Manually add your questions here
+      </button>
     </div>
   );
 };
