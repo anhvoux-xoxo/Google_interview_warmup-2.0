@@ -1,8 +1,30 @@
-
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 
-// Fix: Initializing GoogleGenAI with a named parameter using process.env.API_KEY as per the guidelines
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Audio
+          }
+        },
+        {
+          text: "Transcribe this interview answer exactly as spoken. Do not add any feedback, just the text. If the audio is silent, return an empty string."
+        }
+      ],
+    });
+
+    return response.text?.trim() || "";
+  } catch (error) {
+    console.error("Transcription Error:", error);
+    return "";
+  }
+};
 
 export const getAiSuggestion = async (question: string): Promise<string> => {
   try {
@@ -66,7 +88,6 @@ export const generateQuestions = async (jobDescription: string): Promise<{text: 
     return Array.isArray(questions) ? questions : [];
   } catch (error) {
     console.error("Gemini API Error:", error);
-    // Returning meaningful defaults on error
     return [
       { text: "Can you describe your relevant experience?", type: "Background" },
       { text: "Why are you interested in this role?", type: "Background" },
@@ -95,7 +116,6 @@ export const generateSpeech = async (text: string): Promise<Uint8Array | null> =
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) return null;
 
-    // Fix: Implemented manual decode function for base64 as suggested in the coding guidelines
     const binaryString = atob(base64Audio);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Info, Edit2, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+
+import React, { useState, useRef } from 'react';
+import { Info, Edit2, ChevronDown } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
 
 interface CustomQuestionInputProps {
@@ -9,7 +10,12 @@ interface CustomQuestionInputProps {
 export const CustomQuestionInput: React.FC<CustomQuestionInputProps> = ({ onAdd }) => {
   const [questionText, setQuestionText] = useState('');
   const [answerText, setAnswerText] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const questionInputRef = useRef<HTMLInputElement>(null);
+  const answerInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const focusQuestion = () => questionInputRef.current?.focus();
+  const focusAnswer = () => answerInputRef.current?.focus();
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -19,60 +25,46 @@ export const CustomQuestionInput: React.FC<CustomQuestionInputProps> = ({ onAdd 
           Custom question
         </span>
 
-        <div className="relative mb-8 flex items-center">
+        <div className="relative mb-8 flex items-center group">
             <input
-            type="text"
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-            placeholder="Type your question here"
-            className="w-full text-2xl md:text-3xl font-medium text-black placeholder:text-slate-300 border border-black focus:border-black focus:ring-0 focus:outline-none p-4 rounded-xl bg-white transition-all hover:border-blue-600"
-            autoFocus
+                ref={questionInputRef}
+                type="text"
+                value={questionText}
+                onChange={(e) => setQuestionText(e.target.value)}
+                placeholder="Type your question here"
+                className="w-full text-2xl md:text-3xl font-medium text-black placeholder:text-slate-300 border border-black focus:border-black focus:ring-0 focus:outline-none p-4 rounded-xl bg-white transition-all hover:border-blue-600"
+                autoFocus
             />
-             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <Edit2 className="w-6 h-6 text-slate-400" />
-            </div>
+             <button 
+                onClick={focusQuestion}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
+             >
+                <Edit2 className="w-6 h-6" />
+            </button>
         </div>
 
         <div className="border-t border-slate-200 pt-6 mb-8">
           <div className="flex items-center justify-between text-slate-800 mb-4">
             <div className="flex items-center text-lg font-medium">
-               <ChevronDown className={`w-5 h-5 mr-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+               <ChevronDown className="w-5 h-5 mr-3" />
                Your answer
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center text-sm font-medium"
-                title={isExpanded ? "Collapse" : "Expand"}
-              >
-                {isExpanded ? (
-                  <>
-                    <Minimize2 className="w-4 h-4 mr-1" />
-                    Collapse
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="w-4 h-4 mr-1" />
-                    Expand
-                  </>
-                )}
-              </button>
             </div>
           </div>
           
-          <div className="relative">
+          <div className="relative group">
             <textarea
+               ref={answerInputRef}
                value={answerText}
                onChange={(e) => setAnswerText(e.target.value)}
-               className={`w-full transition-all duration-300 bg-white rounded-xl p-4 border border-slate-200 resize-none focus:outline-none focus:border-slate-400 text-black placeholder:text-slate-400 pr-10 hover:border-blue-400 ${
-                 isExpanded ? 'min-h-[400px]' : 'min-h-[120px]'
-               }`}
+               className="w-full min-h-[120px] bg-white rounded-xl p-4 border border-slate-200 resize-y focus:outline-none focus:border-slate-400 text-black placeholder:text-slate-400 pr-10 hover:border-blue-400"
                placeholder="Type your answer here..."
             />
-            <div className="absolute top-4 right-4 pointer-events-none text-blue-500">
-               <Edit2 className="w-5 h-5" />
-            </div>
+            <button 
+              onClick={focusAnswer}
+              className="absolute bottom-3 right-8 text-slate-400 hover:text-blue-600 transition-colors"
+            >
+              <Edit2 className="w-5 h-5" />
+            </button>
           </div>
         </div>
 

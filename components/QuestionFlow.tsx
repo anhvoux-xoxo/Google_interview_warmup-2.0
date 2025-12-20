@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Question, Recording } from '../types';
-import { Mic, Video, Keyboard, RefreshCcw, Edit2, Info, Check, ChevronDown, RotateCcw, Play, Pause, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mic, Video, Keyboard, Edit2, Info, ChevronDown, RotateCcw, Play, Pause, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
-import { generateSpeech } from '../services/geminiService';
+import { generateSpeech, transcribeAudio } from '../services/geminiService';
 
 interface QuestionFlowProps {
   question: Question;
@@ -15,7 +16,7 @@ interface QuestionFlowProps {
   onPrev?: () => void;
 }
 
-type FlowState = 'READING' | 'INPUT_SELECTION' | 'RECORDING_VOICE' | 'PREVIEW_CAMERA' | 'RECORDING_CAMERA' | 'TYPING' | 'REVIEW' | 'REDO_CONFIRM';
+type FlowState = 'READING' | 'INPUT_SELECTION' | 'RECORDING_VOICE' | 'PREVIEW_CAMERA' | 'RECORDING_CAMERA' | 'TYPING' | 'REVIEW';
 
 async function decodePCM(
   data: Uint8Array,
@@ -164,8 +165,6 @@ const PlaybackVisualizer = ({ isPlaying }: { isPlaying: boolean }) => {
 export const QuestionFlow: React.FC<QuestionFlowProps> = ({ 
   question, 
   onComplete, 
-  dontAskRedo, 
-  setDontAskRedo,
   sessionIndex,
   sessionTotal,
   onNext,
@@ -173,13 +172,13 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
 }) => {
   const [flowState, setFlowState] = useState<FlowState>('READING');
   const [transcript, setTranscript] = useState('');
+  const [isTranscribing, setIsTranscribing] = useState(false);
   
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [voiceStream, setVoiceStream] = useState<MediaStream | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
-  const [isRecordingMedia, setIsRecordingMedia] = useState(false);
-  const [isContentExpanded, setIsContentExpanded] = useState(true);
+  const [isContentExpanded, setIsContentExpanded] = useState(false);
   
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playbackIsPlaying, setPlaybackIsPlaying] = useState(false);
@@ -187,13 +186,12 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const transcriptRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   
   const ttsSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const ttsAudioContextRef = useRef<AudioContext | null>(null);
-  const [nextRedoMode, setNextRedoMode] = useState<'voice' | 'camera' | 'typing' | null>(null);
-  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     let interval: number;
@@ -215,50 +213,6 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
   }, []);
 
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onresult = (event: any) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript + ' ';
-          }
-        }
-        if (finalTranscript) {
-             setTranscript(prev => prev + finalTranscript); 
-        }
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-          if (event.error !== 'no-speech') console.log("Speech recognition error", event.error);
-      };
-      
-      recognitionRef.current.onend = () => {
-         if (isRecordingMedia && recognitionRef.current && !isPaused && flowState !== 'REVIEW') {
-             try { recognitionRef.current.start(); } catch(e) {}
-         }
-      };
-    }
-  }, [isRecordingMedia, isPaused, flowState]); 
-
-  const startListening = () => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.start(); } catch (e) {}
-    }
-  };
-
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (e) {}
-    }
-  };
-
-  useEffect(() => {
     setFlowState('READING');
     setTranscript('');
     setRecordedVideoUrl(null);
@@ -267,6 +221,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     setCameraStream(null);
     setRecordingDuration(0);
     setIsPaused(false);
+    setIsTranscribing(false);
 
     let isMounted = true;
 
@@ -316,7 +271,6 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
       if (ttsSourceRef.current) { try { ttsSourceRef.current.stop(); } catch(e) {} }
       if (ttsAudioContextRef.current && ttsAudioContextRef.current.state !== 'closed') ttsAudioContextRef.current.close();
       stopCamera();
-      stopListening();
     };
   }, [question]);
 
@@ -343,14 +297,6 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     } else {
       stopCamera();
     }
-    
-    if (flowState === 'RECORDING_VOICE' || flowState === 'RECORDING_CAMERA') {
-        setIsRecordingMedia(true);
-        startListening();
-    } else {
-        setIsRecordingMedia(false);
-        stopListening();
-    }
   }, [flowState]);
 
   const startRecording = async (mode: 'video' | 'audio') => {
@@ -368,12 +314,24 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mediaRecorder.onstop = () => {
-         const type = mode === 'video' ? 'video/webm' : 'audio/webm';
-         const blob = new Blob(chunksRef.current, { type });
+      mediaRecorder.onstop = async () => {
+         const mimeType = mode === 'video' ? 'video/webm' : 'audio/webm';
+         const blob = new Blob(chunksRef.current, { type: mimeType });
          const url = URL.createObjectURL(blob);
          if (mode === 'video') setRecordedVideoUrl(url);
          else setRecordedAudioUrl(url);
+         
+         // Start transcription with Gemini
+         setIsTranscribing(true);
+         const reader = new FileReader();
+         reader.readAsDataURL(blob);
+         reader.onloadend = async () => {
+            const base64data = (reader.result as string).split(',')[1];
+            const result = await transcribeAudio(base64data, mimeType);
+            setTranscript(result);
+            setIsTranscribing(false);
+         };
+
          if (mode === 'audio') { stream.getTracks().forEach(t => t.stop()); setVoiceStream(null); }
       };
       mediaRecorder.start();
@@ -394,11 +352,9 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     if (isPaused) {
         mediaRecorderRef.current.resume();
         setIsPaused(false);
-        if (recognitionRef.current) { try { recognitionRef.current.start(); } catch(e) {} }
     } else {
         mediaRecorderRef.current.pause();
         setIsPaused(true);
-        if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch(e) {} }
     }
   };
 
@@ -518,7 +474,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
              
              {/* Show Pre-provided answer if exists */}
              {question.answer && (
-                <div className="w-full bg-slate-50 rounded-xl p-6 border border-slate-200 mb-8">
+                <div className="w-full bg-slate-50 rounded-xl p-6 border border-slate-200 mb-8 relative group">
                     <p className="text-slate-700 text-lg leading-relaxed italic">"{question.answer}"</p>
                 </div>
              )}
@@ -563,9 +519,24 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
         )}
 
         {flowState === 'TYPING' && (
-           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] h-96 flex flex-col">
+           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] flex flex-col min-h-[400px]">
               <h3 className={`${headerClass} mb-4`}><Keyboard className="w-8 h-8 mr-3" /> Your answer</h3>
-              <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="flex-grow w-full resize-none border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white" placeholder="Type your answer here..." autoFocus />
+              <div className="relative flex-grow group">
+                <textarea 
+                  ref={transcriptRef}
+                  value={transcript} 
+                  onChange={(e) => setTranscript(e.target.value)} 
+                  className="w-full h-full min-h-[300px] resize-y border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white" 
+                  placeholder="Type your answer here..." 
+                  autoFocus 
+                />
+                <button 
+                  onClick={() => transcriptRef.current?.focus()}
+                  className="absolute bottom-3 right-8 text-slate-400 hover:text-blue-600 transition-colors"
+                >
+                  <Edit2 className="w-5 h-5" />
+                </button>
+              </div>
               <div className="pt-4 border-t border-slate-100"><button onClick={() => setFlowState('REVIEW')} className="px-6 py-2 bg-blue-600 text-white rounded-[20px] font-medium hover:bg-blue-700">Done</button></div>
            </div>
         )}
@@ -573,19 +544,45 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
         {flowState === 'REVIEW' && (
            <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] overflow-hidden">
              {recordedVideoUrl && <div className="aspect-video bg-black w-full"><video src={recordedVideoUrl} controls className="w-full h-full" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} /></div>}
+             
              <div className="flex items-center justify-between p-6 border-b border-slate-100">
                <div className="flex items-center cursor-pointer" onClick={() => setIsContentExpanded(!isContentExpanded)}>
                  <div className={`mr-3 text-slate-800 transition-transform duration-200 ${isContentExpanded ? 'rotate-180' : ''}`}><ChevronDown className="w-6 h-6" /></div>
                  <span className={headerClass}>Your answer</span>
                </div>
-               {recordedVideoUrl && (<button onClick={() => { const v = document.querySelector('video'); if(v) {v.currentTime = 0; v.play();} }} className="w-10 h-10 flex items-center justify-center rounded-lg border border-blue-500 text-blue-500 hover:bg-blue-50"><RotateCcw className="w-5 h-5" /></button>)}
              </div>
+
              {recordedAudioUrl && (<div className="px-6 pt-4"><div className="w-full bg-white border border-slate-200 rounded-full shadow-sm p-3 flex items-center justify-between"><button onClick={handlePlayPause} className="w-10 h-10 rounded-full border-2 border-[#1B6FF3] flex items-center justify-center text-[#1B6FF3] hover:bg-blue-50">{playbackIsPlaying ? (<Pause className="w-4 h-4 fill-current" />) : (<Play className="w-4 h-4 fill-current ml-0.5" />)}</button><div className="flex-grow mx-4 h-10"><PlaybackVisualizer isPlaying={playbackIsPlaying} /></div><div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div></div></div>)}
-             {isContentExpanded && (<div className="p-6 border-b border-slate-100 relative bg-white"><textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} className="w-full min-h-[120px] resize-none outline-none text-black text-lg leading-relaxed pr-8 bg-white" placeholder="Transcripted" /><div className="absolute top-6 right-6 pointer-events-none text-blue-500"><Edit2 className="w-5 h-5" /></div></div>)}
+             
+             <div className="p-6 border-b border-slate-100 relative bg-white transition-all duration-300">
+                {isTranscribing ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mr-3" />
+                        <span className="text-slate-600 font-medium">Transcribing with high accuracy...</span>
+                    </div>
+                ) : (
+                    <div className="relative group">
+                      <textarea 
+                          ref={transcriptRef}
+                          value={transcript} 
+                          onChange={(e) => setTranscript(e.target.value)} 
+                          className="w-full h-full min-h-[120px] resize-y outline-none text-black text-lg leading-relaxed bg-white pr-12" 
+                          placeholder="Your transcript will appear here..." 
+                      />
+                      <button 
+                        onClick={() => transcriptRef.current?.focus()}
+                        className="absolute bottom-3 right-8 text-slate-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                )}
+             </div>
+
              <div className="p-6">
                 <h3 className="text-xl font-medium text-slate-800 mb-4">Redo</h3>
                 <div className="flex space-x-4">
-                   <ActionButton icon={Mic} onClick={() => setFlowState('RECORDING_VOICE')} />
+                   <ActionButton icon={Mic} onClick={() => startRecording('audio')} />
                    <ActionButton icon={Video} onClick={() => setFlowState('PREVIEW_CAMERA')} />
                    <ActionButton icon={Keyboard} onClick={() => setFlowState('TYPING')} />
                 </div>
