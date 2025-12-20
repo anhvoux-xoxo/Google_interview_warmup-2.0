@@ -180,7 +180,6 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
   const [voiceStream, setVoiceStream] = useState<MediaStream | null>(null);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
-  const [isContentExpanded, setIsContentExpanded] = useState(false);
   
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playbackIsPlaying, setPlaybackIsPlaying] = useState(false);
@@ -265,7 +264,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     
     const timer = setTimeout(() => {
         playQuestionAudio();
-    }, 1000); // 1 second delay after clicking start/selecting card
+    }, 1000); // Wait exactly 1 second as requested
 
     return () => {
       isMounted = false;
@@ -281,7 +280,15 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     if (isLoadingSuggestion) return;
     setIsLoadingSuggestion(true);
     const res = await getAiSuggestion(question.text);
-    setSuggestion(res);
+    
+    // Clean up markdown-like symbols for a cleaner display
+    const sanitized = res
+        .replace(/[#*]/g, '') // Remove all # and *
+        .replace(/^- /gm, '• ') // Replace dash bullets with solid bullets
+        .replace(/^\+ /gm, '• ') // Replace plus bullets if any
+        .trim();
+
+    setSuggestion(sanitized);
     setIsLoadingSuggestion(false);
   };
 
@@ -391,13 +398,14 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
 
   const headerClass = "text-2xl text-slate-800 leading-snug font-medium flex items-center";
 
-  const ActionButton = ({ icon: Icon, onClick, active = false, className = "", large = false }: any) => {
+  const ActionButton = ({ icon: Icon, onClick, active = false, className = "", large = false, title }: any) => {
      const sizeClass = large ? "w-16 h-16" : "w-14 h-14"; 
      const iconSize = large ? "w-8 h-8" : "w-6 h-6";
      return (
         <button
           onClick={onClick}
           onMouseEnter={playHoverSound}
+          title={title}
           className={`
             ${sizeClass} rounded-2xl flex items-center justify-center transition-all duration-200
             ${active 
@@ -481,7 +489,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
              <div className="mb-6"><h3 className={headerClass}>Your answer</h3></div>
              
              {suggestion && (
-                <div className="mb-6 p-6 bg-amber-50 rounded-xl border border-amber-200 animate-fade-in">
+                <div className="mb-6 p-6 bg-amber-50 rounded-xl border border-amber-200 animate-fade-in relative">
                   <div className="flex items-center text-amber-800 font-semibold mb-2">
                     <Lightbulb className="w-5 h-5 mr-2" />
                     Key Points for your answer
@@ -561,7 +569,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
                   ref={transcriptRef}
                   value={transcript} 
                   onChange={(e) => setTranscript(e.target.value)} 
-                  className="w-full h-full min-h-[300px] resize-y border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white" 
+                  className="w-full h-full min-h-[300px] resize-y border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white pr-12" 
                   placeholder="Type your answer here..." 
                   autoFocus 
                 />
@@ -581,7 +589,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
              {recordedVideoUrl && <div className="aspect-video bg-black w-full"><video src={recordedVideoUrl} controls className="w-full h-full" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} /></div>}
              
              <div className="flex items-center justify-between p-6 border-b border-slate-100">
-               <div className="flex items-center cursor-pointer">
+               <div className="flex items-center">
                  <div className="mr-3 text-slate-800"><ChevronDown className="w-6 h-6" /></div>
                  <span className={headerClass}>Your answer</span>
                </div>

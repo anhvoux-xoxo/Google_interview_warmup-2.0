@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Info, Edit2, ChevronDown } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
@@ -56,7 +55,7 @@ export const CustomQuestionInput: React.FC<CustomQuestionInputProps> = ({ onAdd 
                ref={answerInputRef}
                value={answerText}
                onChange={(e) => setAnswerText(e.target.value)}
-               className="w-full min-h-[120px] bg-white rounded-xl p-4 border border-slate-200 resize-y focus:outline-none focus:border-slate-400 text-black placeholder:text-slate-400 pr-10 hover:border-blue-400"
+               className="w-full min-h-[120px] bg-white rounded-xl p-4 border border-slate-200 resize-y focus:outline-none focus:border-slate-400 text-black placeholder:text-slate-400 pr-12 hover:border-blue-400"
                placeholder="Type your answer here..."
             />
             <button 

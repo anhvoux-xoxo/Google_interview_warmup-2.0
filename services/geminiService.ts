@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -35,9 +36,14 @@ export const getAiSuggestion = async (question: string): Promise<string> => {
       Question: "${question}"
       
       Please provide a concise, structured "Ideal Answer" or a set of key "Talking Points" that the user should cover in their response. 
-      Keep the tone professional and encouraging. 
-      Limit the response to around 150 words.
-      Format neatly.
+      
+      STRICT FORMATTING RULES:
+      - Use ONLY plain text.
+      - DO NOT use any Markdown symbols like asterisks (*), hashes (#), or underscores (_).
+      - For lists, use the bullet point symbol (•) at the start of the line.
+      - Use double line breaks to separate paragraphs.
+      - Keep the tone professional and encouraging. 
+      - Limit the response to around 150 words.
     `;
 
     const response = await ai.models.generateContent({

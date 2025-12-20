@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QuestionCategory, Question } from '../types';
-import { Info, Plus } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
 
 interface PracticeProps {
@@ -37,7 +37,7 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
               onMouseEnter={playHoverSound}
               onClick={() => setActiveFilter(filter)}
               className={`
-                px-5 py-2 rounded-full text-sm font-medium transition-colors border
+                px-5 py-2 rounded-full text-sm font-medium transition-colors border flex items-center
                 ${isActive
                   ? 'bg-blue-600 text-white border-blue-600 shadow-[0_4px_12px_rgba(37,99,235,0.3)]' 
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-600'}
@@ -45,7 +45,7 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
             >
               {filter} 
               {filter === 'All' && (
-                  <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`ml-2 px-1.5 py-0.5 rounded-full text-sm font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
                       {questions.length}
                   </span>
               )}
@@ -60,7 +60,7 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
             key={q.id}
             onMouseEnter={playHoverSound}
             onClick={() => onSelectQuestion(q)}
-            className="group cursor-pointer bg-white p-6 rounded-2xl border border-transparent shadow-[0_10px_30px_rgba(90,85,120,0.15)] hover:shadow-[0_16px_40px_rgba(165,155,250,0.22)] hover:border-blue-100 transition-all h-full min-h-[160px] flex flex-col items-start"
+            className="group cursor-pointer bg-white p-6 rounded-2xl border border-transparent shadow-[0_10px_30_rgba(90,85,120,0.15)] hover:shadow-[0_16px_40px_rgba(165,155,250,0.22)] hover:border-blue-100 transition-all h-full min-h-[160px] flex flex-col items-start"
           >
             <span className={`
               inline-flex items-center px-2 py-1 rounded-md text-xs font-medium mb-4
@@ -85,7 +85,6 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
             onClick={onAddCustomQuestion}
             className="group cursor-pointer bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 hover:border-blue-400 hover:bg-blue-100 transition-all h-full min-h-[160px] flex flex-col items-center justify-center text-blue-600"
           >
-            <Plus className="w-10 h-10 mb-2 group-hover:scale-110 transition-transform" />
             <span className="font-semibold text-lg">Add custom question</span>
           </button>
         )}
