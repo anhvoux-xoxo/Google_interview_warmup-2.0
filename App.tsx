@@ -58,19 +58,16 @@ export default function App() {
   const [questions, setQuestions] = useState(INITIAL_QUESTIONS);
   const [dontAskRedo, setDontAskRedo] = useState(false);
 
-  // Session State (for the "5 questions" flow)
   const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   const [currentSessionIndex, setCurrentSessionIndex] = useState(0);
 
   const currentView = history[currentViewIndex];
   
-  // Back label logic: If we are not on the first page, show the selected option from the first page
-  // as the primary label, or the standard view label if appropriate.
   const getBackLabel = () => {
     if (currentViewIndex === 0) return '';
     
-    // If the previous page was the landing page, show the selected category name as requested
-    if (history[currentViewIndex - 1] === View.FIELD_SELECTION && selectedCategory) {
+    // Left arrow should always show the title of the selected field from the first page
+    if (selectedCategory) {
       return selectedCategory;
     }
     
@@ -91,7 +88,6 @@ export default function App() {
 
   const handleSelectCategory = (cat: QuestionCategory) => {
     setSelectedCategory(cat);
-    // Reset custom questions data if users go back and select a different field
     setQuestions(prev => ({
       ...prev,
       [QuestionCategory.CUSTOM]: []
@@ -175,7 +171,7 @@ export default function App() {
   };
 
   const handleSelectQuestion = (q: Question) => {
-    setSessionQuestions([]); // Clear current session if selecting individual question
+    setSessionQuestions([]);
     setSelectedQuestion(q);
     navigateTo(View.QUESTION_FLOW);
   };

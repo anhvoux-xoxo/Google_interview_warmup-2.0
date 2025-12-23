@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Question, Recording } from '../types';
-import { Mic, Video, Keyboard, Edit2, Info, ChevronDown, RotateCcw, Play, Pause, ArrowRight, ArrowLeft, Loader2, Lightbulb } from 'lucide-react';
+import { Mic, Video, Keyboard, Edit2, Info, ChevronDown, ChevronRight, Play, Pause, ArrowRight, ArrowLeft, Loader2, Lightbulb } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
 import { generateSpeech, transcribeAudio, getAiSuggestion } from '../services/geminiService';
 
@@ -175,6 +174,8 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
+  const [isAnswerVisible, setIsAnswerVisible] = useState(true);
+  const [isAnswerLarge, setIsAnswerLarge] = useState(false);
   
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [voiceStream, setVoiceStream] = useState<MediaStream | null>(null);
@@ -224,6 +225,8 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     setRecordingDuration(0);
     setIsPaused(false);
     setIsTranscribing(false);
+    setIsAnswerVisible(true);
+    setIsAnswerLarge(false);
 
     let isMounted = true;
 
@@ -264,7 +267,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     
     const timer = setTimeout(() => {
         playQuestionAudio();
-    }, 1000); // Wait exactly 1 second as requested
+    }, 1000);
 
     return () => {
       isMounted = false;
@@ -281,11 +284,10 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     setIsLoadingSuggestion(true);
     const res = await getAiSuggestion(question.text);
     
-    // Clean up markdown-like symbols for a cleaner display
     const sanitized = res
-        .replace(/[#*]/g, '') // Remove all # and *
-        .replace(/^- /gm, '• ') // Replace dash bullets with solid bullets
-        .replace(/^\+ /gm, '• ') // Replace plus bullets if any
+        .replace(/[#*]/g, '')
+        .replace(/^- /gm, '• ')
+        .replace(/^\+ /gm, '• ')
         .trim();
 
     setSuggestion(sanitized);
@@ -339,15 +341,20 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
          if (mode === 'video') setRecordedVideoUrl(url);
          else setRecordedAudioUrl(url);
          
-         setIsTranscribing(true);
-         const reader = new FileReader();
-         reader.readAsDataURL(blob);
-         reader.onloadend = async () => {
-            const base64data = (reader.result as string).split(',')[1];
-            const result = await transcribeAudio(base64data, mimeType);
-            setTranscript(result);
-            setIsTranscribing(false);
-         };
+         if (blob.size > 0) {
+           setIsTranscribing(true);
+           const reader = new FileReader();
+           reader.readAsDataURL(blob);
+           reader.onloadend = async () => {
+              const base64data = (reader.result as string).split(',')[1];
+              const result = await transcribeAudio(base64data, mimeType);
+              const trimmedResult = result ? result.trim() : '';
+              setTranscript(trimmedResult);
+              setIsTranscribing(false);
+           };
+         } else {
+           setTranscript('');
+         }
 
          if (mode === 'audio') { stream.getTracks().forEach(t => t.stop()); setVoiceStream(null); }
       };
@@ -420,6 +427,8 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
      );
   };
 
+  const hasUserAnswer = transcript.trim().length > 0 || recordedAudioUrl !== null || isTranscribing;
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col min-h-[80vh]">
       
@@ -486,26 +495,40 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
 
         {flowState === 'INPUT_SELECTION' && (
           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] animate-fade-in flex flex-col">
-             <div className="mb-6"><h3 className={headerClass}>Your answer</h3></div>
-             
-             {suggestion && (
-                <div className="mb-6 p-6 bg-amber-50 rounded-xl border border-amber-200 animate-fade-in relative">
-                  <div className="flex items-center text-amber-800 font-semibold mb-2">
-                    <Lightbulb className="w-5 h-5 mr-2" />
-                    Key Points for your answer
-                  </div>
-                  <div className="text-amber-900 text-sm whitespace-pre-wrap leading-relaxed">
-                    {suggestion}
-                  </div>
+             <div className="mb-6 flex items-center justify-between">
+                <div 
+                  className="flex items-center cursor-pointer select-none group"
+                  onClick={() => setIsAnswerVisible(!isAnswerVisible)}
+                >
+                   <div className="mr-3 text-slate-800 transition-transform duration-200">
+                      {isAnswerVisible ? <ChevronDown className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
+                   </div>
+                   <h3 className={headerClass}>Your answer</h3>
                 </div>
-             )}
+             </div>
+             
+             <div className={`grid transition-all duration-300 ease-in-out ${isAnswerVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+               <div className="overflow-hidden">
+                 {suggestion && (
+                    <div className="mb-6 p-6 bg-amber-50 rounded-xl border border-amber-200 relative">
+                      <div className="flex items-center text-amber-800 font-semibold mb-2">
+                        <Lightbulb className="w-5 h-5 mr-2" />
+                        Key Points for your answer
+                      </div>
+                      <div className="text-amber-900 text-sm whitespace-pre-wrap leading-relaxed">
+                        {suggestion}
+                      </div>
+                    </div>
+                 )}
 
-             {isLoadingSuggestion && (
-               <div className="mb-6 p-6 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin mr-3" />
-                  <span className="text-slate-600 font-medium">Getting key points...</span>
+                 {isLoadingSuggestion && (
+                   <div className="mb-6 p-6 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin mr-3" />
+                      <span className="text-slate-600 font-medium">Getting key points...</span>
+                   </div>
+                 )}
                </div>
-             )}
+             </div>
 
              <div className="flex items-center justify-between">
                 <div className="flex space-x-4">
@@ -563,71 +586,108 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
 
         {flowState === 'TYPING' && (
            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] flex flex-col min-h-[400px]">
-              <h3 className={`${headerClass} mb-4`}><Keyboard className="w-8 h-8 mr-3" /> Your answer</h3>
-              <div className="relative flex-grow group">
-                <textarea 
-                  ref={transcriptRef}
-                  value={transcript} 
-                  onChange={(e) => setTranscript(e.target.value)} 
-                  className="w-full h-full min-h-[300px] resize-y border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white pr-12" 
-                  placeholder="Type your answer here..." 
-                  autoFocus 
-                />
-                <button 
-                  onClick={() => transcriptRef.current?.focus()}
-                  className="absolute bottom-3 right-8 text-slate-400 hover:text-blue-600 transition-colors"
-                >
-                  <Edit2 className="w-5 h-5" />
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                 <div className="flex items-center select-none">
+                    <h3 className={headerClass}><Keyboard className="w-8 h-8 mr-3" /> Type Your Answer</h3>
+                 </div>
               </div>
-              <div className="pt-4 border-t border-slate-100"><button onClick={() => setFlowState('REVIEW')} className="px-6 py-2 bg-blue-600 text-white rounded-[20px] font-medium hover:bg-blue-700">Done</button></div>
+              
+              <div className="flex-grow flex flex-col h-full animate-fade-in">
+                <div className="relative flex-grow group">
+                  <textarea 
+                    ref={transcriptRef}
+                    value={transcript} 
+                    onChange={(e) => setTranscript(e.target.value)} 
+                    className={`w-full transition-all duration-300 resize-y border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white pr-24 ${isAnswerLarge ? 'min-h-[400px]' : 'min-h-[300px]'}`} 
+                    placeholder="Type your answer here..." 
+                    autoFocus 
+                  />
+                  <div className="absolute bottom-4 right-10 flex items-center">
+                     <button onClick={() => transcriptRef.current?.focus()} className="text-slate-400 hover:text-blue-600 transition-colors" title="Edit">
+                       <Edit2 className="w-4 h-4" />
+                     </button>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-slate-100"><button onClick={() => setFlowState('REVIEW')} className="px-6 py-2 bg-blue-600 text-white rounded-[20px] font-medium hover:bg-blue-700">Done</button></div>
+              </div>
            </div>
         )}
 
         {flowState === 'REVIEW' && (
-           <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] overflow-hidden">
+           <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] overflow-hidden flex flex-col">
              {recordedVideoUrl && <div className="aspect-video bg-black w-full"><video src={recordedVideoUrl} controls className="w-full h-full" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} /></div>}
              
-             <div className="flex items-center justify-between p-6 border-b border-slate-100">
-               <div className="flex items-center">
-                 <div className="mr-3 text-slate-800"><ChevronDown className="w-6 h-6" /></div>
+             <div className="flex flex-col">
+               <div 
+                 className="flex items-center p-6 cursor-pointer select-none group border-b border-slate-100"
+                 onClick={() => setIsAnswerVisible(!isAnswerVisible)}
+               >
+                 <div className="mr-3 text-slate-800 transition-transform duration-200">
+                    {isAnswerVisible ? <ChevronDown className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
+                 </div>
                  <span className={headerClass}>Your answer</span>
+               </div>
+
+               {/* Collapsible area for transcribed answer and audio */}
+               <div className={`grid transition-all duration-300 ease-in-out ${isAnswerVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className="overflow-hidden">
+                     {hasUserAnswer ? (
+                        <div className="bg-white">
+                           {recordedAudioUrl && (
+                             <div className="px-6 pt-6">
+                               <div className="w-full bg-white border border-slate-200 rounded-full shadow-sm p-3 flex items-center justify-between">
+                                  <button onClick={handlePlayPause} className="w-10 h-10 rounded-full border-2 border-[#1B6FF3] flex items-center justify-center text-[#1B6FF3] hover:bg-blue-50">
+                                     {playbackIsPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+                                  </button>
+                                  <div className="flex-grow mx-4 h-10"><PlaybackVisualizer isPlaying={playbackIsPlaying} /></div>
+                                  <div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div>
+                               </div>
+                             </div>
+                           )}
+                           
+                           <div className="p-6 relative bg-white">
+                              {isTranscribing ? (
+                                  <div className="flex items-center justify-center py-8 animate-fade-in">
+                                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin mr-3" />
+                                      <span className="text-slate-600 font-medium">Transcribing ...</span>
+                                  </div>
+                              ) : (
+                                  transcript ? (
+                                    <div className="relative group animate-fade-in">
+                                      <textarea 
+                                          ref={transcriptRef}
+                                          value={transcript} 
+                                          onChange={(e) => setTranscript(e.target.value)} 
+                                          className={`w-full transition-all duration-300 resize-y outline-none text-black text-lg leading-relaxed bg-white pr-24 ${isAnswerLarge ? 'min-h-[300px]' : 'min-h-[120px]'}`} 
+                                          placeholder="" 
+                                      />
+                                      {/* Small Pen icon */}
+                                      <div className="absolute bottom-4 right-10 flex items-center">
+                                         <button 
+                                           onClick={() => transcriptRef.current?.focus()} 
+                                           className="text-slate-400 hover:text-blue-600 transition-colors" 
+                                           title="Edit"
+                                         >
+                                           <Edit2 className="w-4 h-4" />
+                                         </button>
+                                      </div>
+                                    </div>
+                                  ) : null
+                              )}
+                           </div>
+                        </div>
+                     ) : null}
+                  </div>
                </div>
              </div>
 
-             {recordedAudioUrl && (<div className="px-6 pt-4"><div className="w-full bg-white border border-slate-200 rounded-full shadow-sm p-3 flex items-center justify-between"><button onClick={handlePlayPause} className="w-10 h-10 rounded-full border-2 border-[#1B6FF3] flex items-center justify-center text-[#1B6FF3] hover:bg-blue-50">{playbackIsPlaying ? (<Pause className="w-4 h-4 fill-current" />) : (<Play className="w-4 h-4 fill-current ml-0.5" />)}</button><div className="flex-grow mx-4 h-10"><PlaybackVisualizer isPlaying={playbackIsPlaying} /></div><div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div></div></div>)}
-             
-             <div className="p-6 border-b border-slate-100 relative bg-white transition-all duration-300">
-                {isTranscribing ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mr-3" />
-                        <span className="text-slate-600 font-medium">Transcribing with high accuracy...</span>
-                    </div>
-                ) : (
-                    <div className="relative group">
-                      <textarea 
-                          ref={transcriptRef}
-                          value={transcript} 
-                          onChange={(e) => setTranscript(e.target.value)} 
-                          className="w-full h-full min-h-[120px] resize-y outline-none text-black text-lg leading-relaxed bg-white pr-12" 
-                          placeholder="Your transcript will appear here..." 
-                      />
-                      <button 
-                        onClick={() => transcriptRef.current?.focus()}
-                        className="absolute bottom-3 right-8 text-slate-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                )}
-             </div>
-
-             <div className="p-6">
+             {/* Redo section stays visible at all times */}
+             <div className="p-6 bg-white border-t border-slate-100">
                 <h3 className="text-xl font-medium text-slate-800 mb-4">Redo</h3>
                 <div className="flex space-x-4">
-                   <ActionButton icon={Mic} onClick={() => startRecording('audio')} />
-                   <ActionButton icon={Video} onClick={() => setFlowState('PREVIEW_CAMERA')} />
-                   <ActionButton icon={Keyboard} onClick={() => setFlowState('TYPING')} />
+                   <ActionButton icon={Mic} onClick={() => startRecording('audio')} title="Voice Redo" />
+                   <ActionButton icon={Video} onClick={() => setFlowState('PREVIEW_CAMERA')} title="Camera Redo" />
+                   <ActionButton icon={Keyboard} onClick={() => setFlowState('TYPING')} title="Type Redo" />
                 </div>
              </div>
            </div>

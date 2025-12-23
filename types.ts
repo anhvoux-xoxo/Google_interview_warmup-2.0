@@ -12,7 +12,7 @@ export enum QuestionCategory {
   ENGINEERING = 'Engineering',
   DATA_ANALYTICS = 'Data Analytics',
   CYBERSECURITY = 'Cybersecurity',
-  CUSTOM = 'Custom field of your practice here',
+  CUSTOM = 'Custom Practice',
 }
 
 export interface Question {
