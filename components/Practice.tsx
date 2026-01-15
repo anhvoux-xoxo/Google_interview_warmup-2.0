@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { QuestionCategory, Question } from '../types';
-import { Info } from 'lucide-react';
+import { Info, Plus } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
+import { prefetchSpeech, GlobalAudio } from '../services/geminiService';
 
 interface PracticeProps {
   category: QuestionCategory;
   questions: Question[];
   onSelectQuestion: (question: Question) => void;
   onAddCustomQuestion: () => void;
+  onPrefetch?: (text: string) => void;
 }
 
-export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelectQuestion, onAddCustomQuestion }) => {
+export const Practice: React.FC<PracticeProps> = ({ 
+  category, 
+  questions, 
+  onSelectQuestion, 
+  onAddCustomQuestion,
+  onPrefetch
+}) => {
   const [activeFilter, setActiveFilter] = useState('All');
   const filters = ['All', 'Background', 'Situational', 'Technical', 'Custom'];
 
@@ -20,8 +28,19 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
     return q.type === activeFilter;
   });
 
+  const handleMouseEnter = (text: string) => {
+    // 1. Play the hover click/tin sound
+    playHoverSound();
+    // 2. Prime the audio context so it's ready for instant playback
+    GlobalAudio.init();
+    // 3. Start pre-fetching the Gemini TTS data immediately
+    prefetchSpeech(text);
+    // 4. Update the app state if callback provided
+    if (onPrefetch) onPrefetch(text);
+  };
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 pt-24 pb-8">
       <div className="text-center mb-10">
         <h2 className="text-xl font-normal text-slate-800">
           Click a question to begin, filter by type, add custom questions
@@ -58,9 +77,9 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
         {filteredQuestions.map((q) => (
           <div 
             key={q.id}
-            onMouseEnter={playHoverSound}
+            onMouseEnter={() => handleMouseEnter(q.text)}
             onClick={() => onSelectQuestion(q)}
-            className="group cursor-pointer bg-white p-6 rounded-2xl border border-transparent shadow-[0_10px_30_rgba(90,85,120,0.15)] hover:shadow-[0_16px_40px_rgba(165,155,250,0.22)] hover:border-blue-100 transition-all h-full min-h-[160px] flex flex-col items-start"
+            className="group cursor-pointer bg-white p-6 rounded-2xl border border-transparent shadow-[0_10px_30px_rgba(90,85,120,0.15)] hover:shadow-[0_16px_40px_rgba(165,155,250,0.22)] hover:border-blue-100 transition-all h-full min-h-[160px] flex flex-col items-start"
           >
             <span className={`
               inline-flex items-center px-2 py-1 rounded-md text-xs font-medium mb-4
@@ -70,7 +89,7 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
                 'bg-yellow-100 text-yellow-800'}
             `}>
               <Info className="w-3 h-3 mr-1" />
-              {q.type}
+              {q.type === 'Custom question' ? 'Custom' : q.type}
             </span>
             <h3 className="text-lg font-medium text-slate-800 leading-snug group-hover:text-blue-700 transition-colors">
               {q.text}
@@ -78,14 +97,16 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
           </div>
         ))}
         
-        {/* Always show Add button in Custom filter */}
         {activeFilter === 'Custom' && (
           <button 
             onMouseEnter={playHoverSound}
             onClick={onAddCustomQuestion}
             className="group cursor-pointer bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 hover:border-blue-400 hover:bg-blue-100 transition-all h-full min-h-[160px] flex flex-col items-center justify-center text-blue-600"
           >
-            <span className="font-semibold text-lg">Add custom question</span>
+            <div className="flex items-center">
+              <Plus className="w-6 h-6 mr-2" />
+              <span className="font-semibold text-lg">Add custom question</span>
+            </div>
           </button>
         )}
 
