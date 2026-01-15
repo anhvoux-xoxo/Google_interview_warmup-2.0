@@ -2,23 +2,15 @@ import React, { useState } from 'react';
 import { QuestionCategory, Question } from '../types';
 import { Info, Plus } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
-import { prefetchSpeech, GlobalAudio } from '../services/geminiService';
 
 interface PracticeProps {
   category: QuestionCategory;
   questions: Question[];
   onSelectQuestion: (question: Question) => void;
   onAddCustomQuestion: () => void;
-  onPrefetch?: (text: string) => void;
 }
 
-export const Practice: React.FC<PracticeProps> = ({ 
-  category, 
-  questions, 
-  onSelectQuestion, 
-  onAddCustomQuestion,
-  onPrefetch
-}) => {
+export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelectQuestion, onAddCustomQuestion }) => {
   const [activeFilter, setActiveFilter] = useState('All');
   const filters = ['All', 'Background', 'Situational', 'Technical', 'Custom'];
 
@@ -28,19 +20,8 @@ export const Practice: React.FC<PracticeProps> = ({
     return q.type === activeFilter;
   });
 
-  const handleMouseEnter = (text: string) => {
-    // 1. Play the hover click/tin sound
-    playHoverSound();
-    // 2. Prime the audio context so it's ready for instant playback
-    GlobalAudio.init();
-    // 3. Start pre-fetching the Gemini TTS data immediately
-    prefetchSpeech(text);
-    // 4. Update the app state if callback provided
-    if (onPrefetch) onPrefetch(text);
-  };
-
   return (
-    <div className="max-w-5xl mx-auto px-4 pt-24 pb-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="text-center mb-10">
         <h2 className="text-xl font-normal text-slate-800">
           Click a question to begin, filter by type, add custom questions
@@ -77,7 +58,7 @@ export const Practice: React.FC<PracticeProps> = ({
         {filteredQuestions.map((q) => (
           <div 
             key={q.id}
-            onMouseEnter={() => handleMouseEnter(q.text)}
+            onMouseEnter={playHoverSound}
             onClick={() => onSelectQuestion(q)}
             className="group cursor-pointer bg-white p-6 rounded-2xl border border-transparent shadow-[0_10px_30px_rgba(90,85,120,0.15)] hover:shadow-[0_16px_40px_rgba(165,155,250,0.22)] hover:border-blue-100 transition-all h-full min-h-[160px] flex flex-col items-start"
           >
@@ -97,6 +78,7 @@ export const Practice: React.FC<PracticeProps> = ({
           </div>
         ))}
         
+        {/* Always show Add button in Custom filter */}
         {activeFilter === 'Custom' && (
           <button 
             onMouseEnter={playHoverSound}

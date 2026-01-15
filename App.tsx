@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Navbar } from './components/Navbar';
-import { Home } from './components/Home';
 import { FieldSelection } from './components/FieldSelection';
 import { Practice } from './components/Practice';
 import { PracticeStart } from './components/PracticeStart';
 import { QuestionFlow } from './components/QuestionFlow';
 import { CustomJobInput } from './components/CustomJobInput';
 import { CustomQuestionInput } from './components/CustomQuestionInput';
-import { View, QuestionCategory, Question, Recording } from './types';
-import { generateSpeech, GlobalAudio, prefetchSpeech } from './services/geminiService';
+import { Onboarding } from './components/Onboarding';
+import { View, QuestionCategory, Question } from './types';
+import { playHoverSound } from './utils/sound';
 
 const INITIAL_QUESTIONS: Record<string, Question[]> = {
   [QuestionCategory.UX_DESIGN]: [
@@ -42,16 +43,6 @@ const INITIAL_QUESTIONS: Record<string, Question[]> = {
   [QuestionCategory.CUSTOM]: []
 };
 
-const VIEW_LABELS: Record<View, string> = {
-  [View.ONBOARDING]: 'Welcome',
-  [View.FIELD_SELECTION]: 'Fields',
-  [View.ALL_QUESTIONS]: 'All Questions',
-  [View.QUESTION_FLOW]: 'Practice Session',
-  [View.CUSTOM_DESCRIPTION]: 'Job Description',
-  [View.CUSTOM_ADD]: 'Add Question',
-  [View.PRACTICE_START]: 'Start Practice',
-};
-
 export default function App() {
   const [history, setHistory] = useState<View[]>([View.ONBOARDING]);
   const [currentViewIndex, setCurrentViewIndex] = useState(0);
@@ -66,25 +57,41 @@ export default function App() {
 
   const currentView = history[currentViewIndex];
   
-  const getBackLabel = () => {
-    if (currentViewIndex === 0) return '';
-    if (selectedCategory && history[currentViewIndex - 1] === View.FIELD_SELECTION) return selectedCategory;
-    return VIEW_LABELS[history[currentViewIndex - 1]] || '';
-  };
-
-  const previousViewLabel = getBackLabel();
+  // Session logic: Are we currently in a 5-question flow?
+  const isInSession = currentView === View.QUESTION_FLOW && sessionQuestions.length > 0;
+  
+  const canGoBack = isInSession 
+    ? currentSessionIndex > 0 
+    : currentViewIndex > 0;
+    
+  const canGoForward = isInSession 
+    ? true // Can always go forward in session (last one goes to result)
+    : currentViewIndex < history.length - 1;
 
   const navigateTo = (view: View) => {
-    GlobalAudio.init(); // Warm up context on every navigation
     const newHistory = history.slice(0, currentViewIndex + 1);
     newHistory.push(view);
     setHistory(newHistory);
     setCurrentViewIndex(newHistory.length - 1);
   };
 
-  const handleBack = () => { GlobalAudio.stop(); GlobalAudio.init(); if (currentViewIndex > 0) setCurrentViewIndex(prev => prev - 1); };
-  const handleForward = () => { GlobalAudio.init(); if (currentViewIndex < history.length - 1) setCurrentViewIndex(prev => prev + 1); };
-  const handleHome = () => { GlobalAudio.stop(); GlobalAudio.init(); navigateTo(View.ONBOARDING); };
+  const handleBack = () => { 
+    if (isInSession && currentSessionIndex > 0) {
+      handlePrevInSession();
+    } else if (currentViewIndex > 0) {
+      setCurrentViewIndex(prev => prev - 1); 
+    }
+  };
+
+  const handleForward = () => { 
+    if (isInSession) {
+      handleNextInSession();
+    } else if (currentViewIndex < history.length - 1) {
+      setCurrentViewIndex(prev => prev + 1); 
+    }
+  };
+
+  const handleHome = () => { navigateTo(View.ONBOARDING); };
 
   const handleSelectCategory = (cat: QuestionCategory) => {
     setSelectedCategory(cat);
@@ -99,12 +106,7 @@ export default function App() {
     if (randomFive.length > 0) {
       setSessionQuestions(randomFive);
       setCurrentSessionIndex(0);
-      const firstQ = randomFive[0];
-      setSelectedQuestion(firstQ);
-      
-      const audioPromise = prefetchSpeech(firstQ.text);
-      GlobalAudio.playSpeech(audioPromise);
-      
+      setSelectedQuestion(randomFive[0]);
       navigateTo(View.QUESTION_FLOW);
     } else {
       navigateTo(View.ALL_QUESTIONS);
@@ -114,12 +116,8 @@ export default function App() {
   const handleNextInSession = () => {
     const nextIdx = currentSessionIndex + 1;
     if (nextIdx < sessionQuestions.length) {
-      const nextQ = sessionQuestions[nextIdx];
       setCurrentSessionIndex(nextIdx);
-      setSelectedQuestion(nextQ);
-      
-      const audioPromise = prefetchSpeech(nextQ.text);
-      GlobalAudio.playSpeech(audioPromise);
+      setSelectedQuestion(sessionQuestions[nextIdx]);
     } else {
       navigateTo(View.ALL_QUESTIONS);
     }
@@ -128,12 +126,8 @@ export default function App() {
   const handlePrevInSession = () => {
     const prevIdx = currentSessionIndex - 1;
     if (prevIdx >= 0) {
-      const prevQ = sessionQuestions[prevIdx];
       setCurrentSessionIndex(prevIdx);
-      setSelectedQuestion(prevQ);
-      
-      const audioPromise = prefetchSpeech(prevQ.text);
-      GlobalAudio.playSpeech(audioPromise);
+      setSelectedQuestion(sessionQuestions[prevIdx]);
     }
   };
 
@@ -144,10 +138,12 @@ export default function App() {
       category: QuestionCategory.CUSTOM,
       type: (q.type as any) || 'Background'
     }));
+
     setQuestions(prev => ({
       ...prev,
       [QuestionCategory.CUSTOM]: [...(prev[QuestionCategory.CUSTOM] || []), ...newQuestions]
     }));
+    
     setSelectedCategory(QuestionCategory.CUSTOM);
     navigateTo(View.PRACTICE_START);
   };
@@ -161,40 +157,33 @@ export default function App() {
       type: 'Custom question',
       answer
     };
+    
     setQuestions(prev => ({
       ...prev,
       [targetCat]: [...(prev[targetCat] || []), newQuestion]
     }));
+
+    navigateTo(View.ALL_QUESTIONS);
+  };
+
+  const handleSeeAllQuestions = () => {
     navigateTo(View.ALL_QUESTIONS);
   };
 
   const handleSelectQuestion = (q: Question) => {
-    GlobalAudio.init();
     setSessionQuestions([]);
     setSelectedQuestion(q);
-    
-    const audioPromise = prefetchSpeech(q.text);
-    GlobalAudio.playSpeech(audioPromise);
-    
     navigateTo(View.QUESTION_FLOW);
   };
 
   const renderView = () => {
     switch (currentView) {
-      case View.ONBOARDING: return <Home onStart={() => navigateTo(View.FIELD_SELECTION)} />;
+      case View.ONBOARDING: return <Onboarding onStart={() => navigateTo(View.FIELD_SELECTION)} />;
       case View.FIELD_SELECTION: return <FieldSelection selectedCategory={selectedCategory} onSelectCategory={handleSelectCategory} />;
-      case View.PRACTICE_START: return <PracticeStart onStartPractice={handleStartPractice} onSeeAllQuestions={() => navigateTo(View.ALL_QUESTIONS)} isCustom={selectedCategory === QuestionCategory.CUSTOM} />;
+      case View.PRACTICE_START: return <PracticeStart onStartPractice={handleStartPractice} onSeeAllQuestions={handleSeeAllQuestions} isCustom={selectedCategory === QuestionCategory.CUSTOM} />;
       case View.CUSTOM_DESCRIPTION: return <CustomJobInput onStart={handleStartCustomJob} onManualAdd={() => navigateTo(View.CUSTOM_ADD)} />;
       case View.CUSTOM_ADD: return <CustomQuestionInput onAdd={handleAddCustomQuestion} />;
-      case View.ALL_QUESTIONS: return (
-        <Practice 
-          category={selectedCategory || QuestionCategory.UX_DESIGN} 
-          questions={questions[selectedCategory!] || []} 
-          onSelectQuestion={handleSelectQuestion} 
-          onAddCustomQuestion={() => navigateTo(View.CUSTOM_ADD)} 
-          onPrefetch={prefetchSpeech}
-        />
-      );
+      case View.ALL_QUESTIONS: return <Practice category={selectedCategory || QuestionCategory.UX_DESIGN} questions={questions[selectedCategory!] || []} onSelectQuestion={handleSelectQuestion} onAddCustomQuestion={() => navigateTo(View.CUSTOM_ADD)} />;
       case View.QUESTION_FLOW: return (
           <QuestionFlow 
             question={selectedQuestion!}
@@ -211,17 +200,46 @@ export default function App() {
     }
   };
 
+  const navIconClass = "fixed top-1/2 -translate-y-1/2 z-40 w-16 h-16 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-xl text-slate-700 hover:bg-slate-50 transition-all hover:scale-110 active:scale-95 group disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100";
+
   return (
-    <div className="min-h-screen text-slate-900 flex flex-col">
+    <div className="min-h-screen text-slate-900 flex flex-col relative bg-[#f8fafc] font-sans">
       <Navbar 
-        onBack={handleBack} 
-        onForward={handleForward}
         onHome={handleHome}
-        canGoBack={currentViewIndex > 0}
-        canGoForward={currentViewIndex < history.length - 1}
-        backLabel={previousViewLabel}
+        backLabel={selectedCategory || ''}
+        isLanding={currentView === View.ONBOARDING}
       />
-      <main className="flex-grow">{renderView()}</main>
+
+      <div className="flex-grow flex justify-center w-full relative">
+        {/* Fixed Navigation Arrows */}
+        {(canGoBack || currentViewIndex > 0) && (
+          <button 
+            onClick={handleBack}
+            disabled={!canGoBack}
+            onMouseEnter={playHoverSound}
+            className={`${navIconClass} left-8 lg:left-12`}
+            title="Go Back"
+          >
+            <ArrowLeft className="w-7 h-7 group-hover:-translate-x-1 transition-transform" />
+          </button>
+        )}
+
+        <main className="flex-grow z-10 w-full max-w-5xl px-6 lg:px-10 py-8">
+          {renderView()}
+        </main>
+
+        {(canGoForward || currentViewIndex < history.length - 1) && (
+          <button 
+            onClick={handleForward}
+            disabled={!canGoForward}
+            onMouseEnter={playHoverSound}
+            className={`${navIconClass} right-8 lg:right-12`}
+            title="Go Forward"
+          >
+            <ArrowRight className="w-7 h-7 group-hover:translate-x-1 transition-transform" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

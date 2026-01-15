@@ -1,3 +1,4 @@
+
 export enum View {
   ONBOARDING = 'ONBOARDING',
   FIELD_SELECTION = 'FIELD_SELECTION',

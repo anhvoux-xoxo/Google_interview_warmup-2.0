@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, Volume2, VolumeX, Home } from 'lucide-react';
+import { Volume2, VolumeX, Home as HomeIcon } from 'lucide-react';
 import { playHoverSound, toggleSoundEnabled, getSoundEnabled } from '../utils/sound';
 
 interface NavbarProps {
-  onBack: () => void;
-  onForward: () => void;
   onHome: () => void;
-  canGoBack: boolean;
-  canGoForward: boolean;
   backLabel?: string;
+  isLanding?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onBack, onForward, onHome, canGoBack, canGoForward, backLabel }) => {
+export const Navbar: React.FC<NavbarProps> = ({ 
+  onHome, 
+  backLabel,
+  isLanding
+}) => {
   const [isSoundOn, setIsSoundOn] = useState(getSoundEnabled());
 
   const toggleSound = () => {
@@ -19,62 +20,52 @@ export const Navbar: React.FC<NavbarProps> = ({ onBack, onForward, onHome, canGo
     setIsSoundOn(newState);
   };
 
-  return (
-    <nav className="sticky top-0 z-50 bg-white h-20 flex items-center border-b border-slate-100/50 shadow-sm">
-      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-        {/* Left Side: Home & Back Button with Label */}
-        <div className="flex items-center space-x-3">
-          <button 
-            onClick={onHome}
-            onMouseEnter={playHoverSound}
-            className="w-12 h-12 flex items-center justify-center rounded-[20px] transition-all duration-200 text-slate-600 bg-[#D9D9D9]/30 hover:bg-[#D9D9D9]/60 cursor-pointer"
-            title="Home"
-          >
-            <Home className="w-6 h-6" />
-          </button>
+  const navButtonClass = "flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-200 hover:bg-slate-50 text-slate-600 hover:text-[#1B6FF3] active:scale-95 group";
 
-          <button 
-            onClick={onBack} 
-            onMouseEnter={playHoverSound}
-            disabled={!canGoBack}
-            className={`
-              w-12 h-12 flex items-center justify-center rounded-[20px] transition-all duration-200 text-black
-              ${canGoBack 
-                ? 'bg-[#D9D9D9]/30 hover:bg-[#D9D9D9]/60 cursor-pointer' 
-                : 'bg-[#D9D9D9]/10 cursor-default opacity-50'}
-            `}
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          {canGoBack && backLabel && (
-            <span className="text-xl font-semibold text-slate-800 animate-fade-in hidden sm:inline truncate max-w-[200px] md:max-w-md">
-              {backLabel}
-            </span>
+  return (
+    <nav className="sticky top-0 z-50 bg-white border-b border-slate-100 h-24 flex items-center shadow-sm">
+      <div className="w-full max-w-5xl mx-auto px-8 lg:px-12 flex justify-between items-center">
+        {/* Left Side: Empty on onboarding page, shows logo elsewhere */}
+        <div className="flex items-center">
+          {!isLanding && (
+            <div className="flex flex-col">
+              <span 
+                className="text-3xl font-bold text-slate-900 font-serif tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={onHome}
+              >
+                Simple<span className="text-[#1B6FF3]">Prep.</span>
+              </span>
+              {backLabel && (
+                <span className="text-xs font-bold text-[#1B6FF3] uppercase tracking-widest font-sans mt-0.5">
+                  {backLabel}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Right Side: Sound Toggle & Forward Button */}
-        <div className="flex items-center space-x-4">
+        {/* Right Side: Home & Sound Buttons (Vertical Layout) */}
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={onHome}
+            onMouseEnter={playHoverSound}
+            className={navButtonClass}
+          >
+            <HomeIcon className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-semibold font-sans">Home</span>
+          </button>
+
           <button
             onClick={toggleSound}
-            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors mr-2"
-            title={isSoundOn ? "Mute" : "Unmute"}
-          >
-            {isSoundOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-          </button>
-          
-          <button 
-            onClick={onForward}
             onMouseEnter={playHoverSound}
-            disabled={!canGoForward}
-            className={`
-              w-12 h-12 flex items-center justify-center rounded-[20px] transition-all duration-200 text-black
-              ${canGoForward 
-                ? 'bg-[#D9D9D9]/30 hover:bg-[#D9D9D9]/60 cursor-pointer' 
-                : 'bg-[#D9D9D9]/10 cursor-default opacity-50'}
-            `}
+            className={navButtonClass}
           >
-            <ArrowRight className="w-6 h-6" />
+            {isSoundOn ? (
+              <Volume2 className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+            ) : (
+              <VolumeX className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+            )}
+            <span className="text-xs font-semibold font-sans">Sound</span>
           </button>
         </div>
       </div>

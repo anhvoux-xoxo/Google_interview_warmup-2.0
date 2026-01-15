@@ -17,7 +17,7 @@ export const CustomQuestionInput: React.FC<CustomQuestionInputProps> = ({ onAdd 
   const focusAnswer = () => answerInputRef.current?.focus();
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-24 pb-8">
+    <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="bg-white rounded-3xl p-8 shadow-[0_10px_30px_rgba(90,85,120,0.15)]">
         <span className="inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium mb-6">
           <Info className="w-3 h-3 mr-2" />

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { playHoverSound } from '../utils/sound';
 import { generateQuestions } from '../services/geminiService';
@@ -25,7 +26,7 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-24 pb-8 flex flex-col items-center">
+    <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col items-center">
       {/* Centered content inside the card */}
       <div className="w-full bg-white rounded-3xl p-12 shadow-[0_10px_30px_rgba(90,85,120,0.15)] mb-12 flex flex-col items-center">
         <h2 className="text-xl font-normal text-slate-800 text-center mb-6">
