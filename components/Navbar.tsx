@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Volume2, VolumeX, Home } from 'lucide-react';
 import { playHoverSound, toggleSoundEnabled, getSoundEnabled } from '../utils/sound';
 
 interface NavbarProps {
   onBack: () => void;
   onForward: () => void;
+  onHome: () => void;
   canGoBack: boolean;
   canGoForward: boolean;
   backLabel?: string;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onBack, onForward, canGoBack, canGoForward, backLabel }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onBack, onForward, onHome, canGoBack, canGoForward, backLabel }) => {
   const [isSoundOn, setIsSoundOn] = useState(getSoundEnabled());
 
   const toggleSound = () => {
@@ -21,8 +22,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onBack, onForward, canGoBack, ca
   return (
     <nav className="sticky top-0 z-50 bg-white h-20 flex items-center border-b border-slate-100/50 shadow-sm">
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-        {/* Left Side: Back Button with Label */}
-        <div className="flex items-center space-x-4">
+        {/* Left Side: Home & Back Button with Label */}
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={onHome}
+            onMouseEnter={playHoverSound}
+            className="w-12 h-12 flex items-center justify-center rounded-[20px] transition-all duration-200 text-slate-600 bg-[#D9D9D9]/30 hover:bg-[#D9D9D9]/60 cursor-pointer"
+            title="Home"
+          >
+            <Home className="w-6 h-6" />
+          </button>
+
           <button 
             onClick={onBack} 
             onMouseEnter={playHoverSound}

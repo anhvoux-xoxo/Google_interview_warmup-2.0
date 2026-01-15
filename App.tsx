@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Navbar } from './components/Navbar';
+import { Home } from './components/Home';
 import { FieldSelection } from './components/FieldSelection';
 import { Practice } from './components/Practice';
 import { PracticeStart } from './components/PracticeStart';
@@ -42,7 +43,8 @@ const INITIAL_QUESTIONS: Record<string, Question[]> = {
 };
 
 const VIEW_LABELS: Record<View, string> = {
-  [View.FIELD_SELECTION]: 'Home',
+  [View.ONBOARDING]: 'Welcome',
+  [View.FIELD_SELECTION]: 'Fields',
   [View.ALL_QUESTIONS]: 'All Questions',
   [View.QUESTION_FLOW]: 'Practice Session',
   [View.CUSTOM_DESCRIPTION]: 'Job Description',
@@ -51,7 +53,7 @@ const VIEW_LABELS: Record<View, string> = {
 };
 
 export default function App() {
-  const [history, setHistory] = useState<View[]>([View.FIELD_SELECTION]);
+  const [history, setHistory] = useState<View[]>([View.ONBOARDING]);
   const [currentViewIndex, setCurrentViewIndex] = useState(0);
   
   const [selectedCategory, setSelectedCategory] = useState<QuestionCategory | null>(null);
@@ -66,7 +68,7 @@ export default function App() {
   
   const getBackLabel = () => {
     if (currentViewIndex === 0) return '';
-    if (selectedCategory) return selectedCategory;
+    if (selectedCategory && history[currentViewIndex - 1] === View.FIELD_SELECTION) return selectedCategory;
     return VIEW_LABELS[history[currentViewIndex - 1]] || '';
   };
 
@@ -82,6 +84,7 @@ export default function App() {
 
   const handleBack = () => { GlobalAudio.stop(); GlobalAudio.init(); if (currentViewIndex > 0) setCurrentViewIndex(prev => prev - 1); };
   const handleForward = () => { GlobalAudio.init(); if (currentViewIndex < history.length - 1) setCurrentViewIndex(prev => prev + 1); };
+  const handleHome = () => { GlobalAudio.stop(); GlobalAudio.init(); navigateTo(View.ONBOARDING); };
 
   const handleSelectCategory = (cat: QuestionCategory) => {
     setSelectedCategory(cat);
@@ -99,7 +102,6 @@ export default function App() {
       const firstQ = randomFive[0];
       setSelectedQuestion(firstQ);
       
-      // IMMEDIATE START: Trigger playback on the click thread
       const audioPromise = prefetchSpeech(firstQ.text);
       GlobalAudio.playSpeech(audioPromise);
       
@@ -116,7 +118,6 @@ export default function App() {
       setCurrentSessionIndex(nextIdx);
       setSelectedQuestion(nextQ);
       
-      // IMMEDIATE START: Trigger playback on the click thread
       const audioPromise = prefetchSpeech(nextQ.text);
       GlobalAudio.playSpeech(audioPromise);
     } else {
@@ -131,7 +132,6 @@ export default function App() {
       setCurrentSessionIndex(prevIdx);
       setSelectedQuestion(prevQ);
       
-      // IMMEDIATE START: Trigger playback on the click thread
       const audioPromise = prefetchSpeech(prevQ.text);
       GlobalAudio.playSpeech(audioPromise);
     }
@@ -169,12 +169,10 @@ export default function App() {
   };
 
   const handleSelectQuestion = (q: Question) => {
-    // CRITICAL: Immediately warm up context and trigger the play command
     GlobalAudio.init();
     setSessionQuestions([]);
     setSelectedQuestion(q);
     
-    // Pull from predictive cache or start immediately - on the UI THREAD
     const audioPromise = prefetchSpeech(q.text);
     GlobalAudio.playSpeech(audioPromise);
     
@@ -183,6 +181,7 @@ export default function App() {
 
   const renderView = () => {
     switch (currentView) {
+      case View.ONBOARDING: return <Home onStart={() => navigateTo(View.FIELD_SELECTION)} />;
       case View.FIELD_SELECTION: return <FieldSelection selectedCategory={selectedCategory} onSelectCategory={handleSelectCategory} />;
       case View.PRACTICE_START: return <PracticeStart onStartPractice={handleStartPractice} onSeeAllQuestions={() => navigateTo(View.ALL_QUESTIONS)} isCustom={selectedCategory === QuestionCategory.CUSTOM} />;
       case View.CUSTOM_DESCRIPTION: return <CustomJobInput onStart={handleStartCustomJob} onManualAdd={() => navigateTo(View.CUSTOM_ADD)} />;
@@ -217,6 +216,7 @@ export default function App() {
       <Navbar 
         onBack={handleBack} 
         onForward={handleForward}
+        onHome={handleHome}
         canGoBack={currentViewIndex > 0}
         canGoForward={currentViewIndex < history.length - 1}
         backLabel={previousViewLabel}
