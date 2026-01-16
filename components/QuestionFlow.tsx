@@ -270,13 +270,11 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
         window.speechSynthesis.speak(utter);
     };
     
-    const timer = setTimeout(() => {
-        playQuestionAudio();
-    }, 1000);
+    // Read the question immediately when it mounts or changes
+    playQuestionAudio();
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
       window.speechSynthesis.cancel();
       if (ttsSourceRef.current) { try { ttsSourceRef.current.stop(); } catch(e) {} }
       if (ttsAudioContextRef.current && ttsAudioContextRef.current.state !== 'closed') ttsAudioContextRef.current.close();

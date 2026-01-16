@@ -91,7 +91,15 @@ export default function App() {
     }
   };
 
-  const handleHome = () => { navigateTo(View.ONBOARDING); };
+  const handleHome = () => { 
+    setSelectedCategory(null);
+    navigateTo(View.ONBOARDING); 
+  };
+
+  const handleStartFromOnboarding = () => {
+    setSelectedCategory(null);
+    navigateTo(View.FIELD_SELECTION);
+  };
 
   const handleSelectCategory = (cat: QuestionCategory) => {
     setSelectedCategory(cat);
@@ -178,7 +186,7 @@ export default function App() {
 
   const renderView = () => {
     switch (currentView) {
-      case View.ONBOARDING: return <Onboarding onStart={() => navigateTo(View.FIELD_SELECTION)} />;
+      case View.ONBOARDING: return <Onboarding onStart={handleStartFromOnboarding} />;
       case View.FIELD_SELECTION: return <FieldSelection selectedCategory={selectedCategory} onSelectCategory={handleSelectCategory} />;
       case View.PRACTICE_START: return <PracticeStart onStartPractice={handleStartPractice} onSeeAllQuestions={handleSeeAllQuestions} isCustom={selectedCategory === QuestionCategory.CUSTOM} />;
       case View.CUSTOM_DESCRIPTION: return <CustomJobInput onStart={handleStartCustomJob} onManualAdd={() => navigateTo(View.CUSTOM_ADD)} />;

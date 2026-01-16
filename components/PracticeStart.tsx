@@ -17,7 +17,7 @@ export const PracticeStart: React.FC<PracticeStartProps> = ({
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] w-full max-w-2xl mx-auto px-4 animate-fade-in-up font-sans">
       {/* Centered Main Card - Reduced Scale */}
       <div className="bg-white rounded-[32px] p-10 md:p-12 border border-slate-50 shadow-[0_15px_45px_rgba(0,0,0,0.03)] flex flex-col items-center w-full">
-        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-10 text-center tracking-tight">
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-10 text-center tracking-tight">
           Practice with 5 interview questions
         </h2>
         

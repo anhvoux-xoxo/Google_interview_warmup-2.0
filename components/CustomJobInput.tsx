@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { playHoverSound } from '../utils/sound';
 import { generateQuestions } from '../services/geminiService';
@@ -61,18 +60,15 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
         </button>
       </div>
 
-      <button
-        onMouseEnter={playHoverSound}
-        onClick={onManualAdd}
-        className="w-full max-w-md px-6 py-4 text-slate-800 font-semibold text-base rounded-[20px] transition-all bg-white hover:shadow-md border border-transparent"
-        style={{ backgroundColor: 'rgba(255,255,255,0.34)' }}
-        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
-        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.34)')}
-        onMouseDown={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,1)')}
-        onMouseUp={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.77)')}
-      >
-        Manually add your questions here
-      </button>
+      <div className="mt-4">
+        <button
+          onMouseEnter={playHoverSound}
+          onClick={onManualAdd}
+          className="px-8 py-3 text-slate-900 font-bold text-lg transition-all rounded-full hover:text-[#2563EB] hover:bg-white border-0 bg-transparent active:scale-95"
+        >
+          Manually add your questions here
+        </button>
+      </div>
     </div>
   );
 };
