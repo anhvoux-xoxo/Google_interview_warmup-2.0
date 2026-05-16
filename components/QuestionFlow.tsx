@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Question, Recording } from '../types';
 import { Mic, Video, Keyboard, Edit2, Info, ChevronDown, ChevronRight, Play, Pause, ArrowRight, ArrowLeft, Loader2, Lightbulb, X } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
-import { generateSpeech, transcribeAudio, getAiSuggestion } from '../services/geminiService';
+import { generateSpeech, transcribeAudio, getAiSuggestion, GlobalAudio, decodePCM } from '../services/geminiService';
 
 interface QuestionFlowProps {
   question: Question;
@@ -13,28 +13,10 @@ interface QuestionFlowProps {
   sessionTotal?: number;
   onNext?: () => void;
   onPrev?: () => void;
+  preFetchedAudioPromise?: Promise<AudioBuffer | null> | null;
 }
 
 type FlowState = 'READING' | 'INPUT_SELECTION' | 'RECORDING_VOICE' | 'PREVIEW_CAMERA' | 'RECORDING_CAMERA' | 'TYPING' | 'REVIEW';
-
-async function decodePCM(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number = 24000,
-  numChannels: number = 1
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
 
 const AudioVisualizer = ({ stream, isRecording = true }: { stream: MediaStream | null, isRecording?: boolean }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -169,13 +151,15 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
   sessionIndex,
   sessionTotal,
   onNext,
-  onPrev
+  onPrev,
+  preFetchedAudioPromise
 }) => {
   const [flowState, setFlowState] = useState<FlowState>('READING');
   const [transcript, setTranscript] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
+  const [isGuideVisible, setIsGuideVisible] = useState(false);
   const [isAnswerVisible, setIsAnswerVisible] = useState(true);
   const [isAnswerLarge, setIsAnswerLarge] = useState(false);
   
@@ -236,23 +220,25 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     let isMounted = true;
 
     const playQuestionAudio = async () => {
+        // Use GlobalAudio to manage stopping/playing
+        const onEnded = () => {
+           if (isMounted) setFlowState(prev => prev === 'READING' ? 'INPUT_SELECTION' : prev);
+        };
+
+        if (preFetchedAudioPromise) {
+            GlobalAudio.playSpeech(preFetchedAudioPromise, onEnded);
+            return;
+        }
+
+        // Fallback if no pre-fetched promise
         const pcmData = await generateSpeech(question.text);
         if (!isMounted) return;
 
         if (pcmData) {
             try {
-                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-                const ctx = new AudioContextClass({ sampleRate: 24000 });
-                ttsAudioContextRef.current = ctx;
+                const ctx = GlobalAudio.init();
                 const audioBuffer = await decodePCM(pcmData, ctx);
-                const source = ctx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(ctx.destination);
-                source.onended = () => {
-                   if (isMounted) setFlowState(prev => prev === 'READING' ? 'INPUT_SELECTION' : prev);
-                };
-                ttsSourceRef.current = source;
-                source.start();
+                GlobalAudio.playSpeech(Promise.resolve(audioBuffer), onEnded);
             } catch (err) {
                 fallbackSynthesis();
             }
@@ -276,11 +262,10 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
     return () => {
       isMounted = false;
       window.speechSynthesis.cancel();
-      if (ttsSourceRef.current) { try { ttsSourceRef.current.stop(); } catch(e) {} }
-      if (ttsAudioContextRef.current && ttsAudioContextRef.current.state !== 'closed') ttsAudioContextRef.current.close();
+      GlobalAudio.stop();
       stopCamera();
     };
-  }, [question]);
+  }, [question, preFetchedAudioPromise]);
 
   const handleGetSuggestion = async () => {
     if (isLoadingSuggestion) return;
@@ -294,6 +279,7 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
         .trim();
 
     setSuggestion(sanitized);
+    setIsGuideVisible(true);
     setIsLoadingSuggestion(false);
   };
 
@@ -352,11 +338,44 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
               const base64data = (reader.result as string).split(',')[1];
               const result = await transcribeAudio(base64data, mimeType);
               const trimmedResult = result ? result.trim() : '';
-              setTranscript(trimmedResult);
+              
+              // Filter out common hallucinations or silence descriptions
+              const silentKeywords = [
+                'silence', 'no speech', 'no sound', 'background noise', 
+                'static', 'unintelligible', 'audio', 'hallucination',
+                '[[empty_audio]]', '[', '(', '...', 
+                'thank you for watching', 'thanks for watching',
+                'please subscribe', 'like and sub', 'youtube',
+                'i am sorry', "i can't", "i'm sorry", // model declining to transcribe noise
+                'he is really trying', 'doing a really good job', 'impressed with him', // specific common hallucinations
+                'yeah he is', 'i am very impressed', 'very impressed with him',
+                'really good job', 'trying and doing', 'is really trying',
+                'he is doing', 'she is doing', 'doing such a good', 'really impressed'
+              ];
+              const lowercaseResult = trimmedResult.toLowerCase();
+              
+              // Hallucinated results usually have a specific pattern
+              // 1. Explicitly mentioned keywords
+              // 2. Extremely short junk words
+              // 3. Third-person commentary (which is wrong for an interview answer)
+              const isLikelySilent = !trimmedResult || 
+                                    trimmedResult.length < 2 || 
+                                    (trimmedResult.length < 200 && silentKeywords.some(kw => lowercaseResult.includes(kw))) ||
+                                    (trimmedResult.split(' ').length < 4 && (
+                                       lowercaseResult === 'the' || 
+                                       lowercaseResult === 'a' || 
+                                       lowercaseResult === 'oh' || 
+                                       lowercaseResult === 'uh' || 
+                                       lowercaseResult === 'you' || 
+                                       lowercaseResult === 'it is' || 
+                                       lowercaseResult === 'there'
+                                    ));
+
+              setTranscript(isLikelySilent ? 'No answer was provided.' : trimmedResult);
               setIsTranscribing(false);
            };
          } else {
-           setTranscript('');
+           setTranscript('No answer was provided.');
          }
 
          if (mode === 'audio') { stream.getTracks().forEach(t => t.stop()); setVoiceStream(null); }
@@ -445,10 +464,10 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
           onMouseEnter={playHoverSound}
           title={title}
           className={`
-            ${sizeClass} rounded-2xl flex items-center justify-center transition-all duration-200
+            ${sizeClass} rounded-2xl flex items-center justify-center transition-all duration-300
             ${active 
-                ? 'bg-[#1B6FF3] text-white border-0' 
-                : 'bg-white text-[#1B6FF3] border border-[#1B6FF3] hover:border-transparent hover:bg-[#1B6FF3]/15 hover:shadow-[0_0_10px_rgba(0,0,0,0.1)]'
+                ? 'bg-[#1B6FF3] text-white border-none shadow-[0_8px_20px_rgba(27,111,243,0.3)]' 
+                : 'bg-white text-[#1B6FF3] border border-[#1B6FF3] hover:bg-[#1B6FF3]/10 active:bg-[#1B6FF3]/20 active:scale-90 hover:shadow-[0_4px_12px_rgba(27,111,243,0.15)]'
             }
             ${className}
           `}
@@ -488,19 +507,17 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
 
       <div className="flex-grow">
         
-        {flowState === 'READING' && (
+        {flowState === 'READING' ? (
           <div className="flex flex-col items-center pt-10">
             <div className="flex items-center space-x-2 text-slate-400 animate-pulse mb-8">
-               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-100"></div>
-               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce delay-200"></div>
+               <div className="w-2 h-2 bg-[#1B6FF3] rounded-full animate-bounce"></div>
+               <div className="w-2 h-2 bg-[#1B6FF3] rounded-full animate-bounce delay-100"></div>
+               <div className="w-2 h-2 bg-[#1B6FF3] rounded-full animate-bounce delay-200"></div>
                <span className="text-sm font-medium text-slate-500">Reading question...</span>
             </div>
           </div>
-        )}
-
-        {flowState === 'INPUT_SELECTION' && (
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] animate-fade-in flex flex-col">
+        ) : (
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] animate-fade-in flex flex-col mb-6">
              <div className="mb-6 flex items-center justify-between">
                 <div 
                   className="flex items-center cursor-pointer select-none group"
@@ -509,17 +526,61 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
                    <div className="mr-3 text-slate-800 transition-transform duration-200">
                       {isAnswerVisible ? <ChevronDown className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
                    </div>
-                   <h3 className={headerClass}>Your answer</h3>
+                   <h3 className={headerClass}>{flowState === 'REVIEW' ? 'Redo' : 'Answer'}</h3>
                 </div>
              </div>
              
+             <div className="flex space-x-4 mb-6">
+                 <ActionButton 
+                  icon={Mic} 
+                  onClick={() => {
+                    if (flowState !== 'RECORDING_VOICE') {
+                      if (hasUserAnswer && !dontAskRedo) handleRedoRequest('VOICE');
+                      else startRecording('audio');
+                    }
+                  }} 
+                  active={flowState === 'RECORDING_VOICE' || (flowState === 'REVIEW' && recordedAudioUrl)}
+                  title="Voice" 
+                 />
+                 <ActionButton 
+                  icon={Video} 
+                  onClick={() => {
+                    if (flowState !== 'PREVIEW_CAMERA' && flowState !== 'RECORDING_CAMERA') {
+                      if (hasUserAnswer && !dontAskRedo) handleRedoRequest('CAMERA');
+                      else setFlowState('PREVIEW_CAMERA');
+                    }
+                  }} 
+                  active={flowState === 'PREVIEW_CAMERA' || flowState === 'RECORDING_CAMERA' || (flowState === 'REVIEW' && recordedVideoUrl)}
+                  title="Camera" 
+                 />
+                 <ActionButton 
+                  icon={Keyboard} 
+                  onClick={() => {
+                    if (flowState !== 'TYPING') {
+                      if (hasUserAnswer && !dontAskRedo) handleRedoRequest('TYPE');
+                      else setFlowState('TYPING');
+                    }
+                  }} 
+                  active={flowState === 'TYPING' || (flowState === 'REVIEW' && !recordedAudioUrl && !recordedVideoUrl && transcript)}
+                  title="Type" 
+                 />
+             </div>
+
              <div className={`grid transition-all duration-300 ease-in-out ${isAnswerVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                <div className="overflow-hidden">
-                 {suggestion && (
-                    <div className="mb-6 p-6 bg-amber-50 rounded-xl border border-amber-200 relative">
+                 {/* Persistent Guide */}
+                 {suggestion && isGuideVisible && (
+                    <div className="mb-4 p-6 bg-amber-50 rounded-xl border border-amber-200 relative animate-fade-in">
+                      <button 
+                        onClick={() => setIsGuideVisible(false)}
+                        className="absolute top-4 right-4 p-1 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-full transition-all"
+                        title="Hide guide"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                       <div className="flex items-center text-amber-800 font-semibold mb-2">
                         <Lightbulb className="w-5 h-5 mr-2" />
-                        Key Points for your answer
+                        How to Answer
                       </div>
                       <div className="text-amber-900 text-sm whitespace-pre-wrap leading-relaxed">
                         {suggestion}
@@ -528,175 +589,193 @@ export const QuestionFlow: React.FC<QuestionFlowProps> = ({
                  )}
 
                  {isLoadingSuggestion && (
-                   <div className="mb-6 p-6 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center">
-                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin mr-3" />
-                      <span className="text-slate-600 font-medium">Getting key points...</span>
+                   <div className="mb-4 p-6 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-[#1B6FF3] animate-spin mr-3" />
+                      <span className="text-slate-600 font-medium">Getting guide...</span>
                    </div>
                  )}
-               </div>
-             </div>
 
-             <div className="flex items-center justify-between">
-                <div className="flex space-x-4">
-                    <ActionButton icon={Mic} onClick={() => startRecording('audio')} title="Voice" />
-                    <ActionButton icon={Video} onClick={() => setFlowState('PREVIEW_CAMERA')} title="Camera" />
-                    <ActionButton icon={Keyboard} onClick={() => setFlowState('TYPING')} title="Type" />
-                </div>
-                <button 
-                  onClick={handleGetSuggestion}
-                  onMouseEnter={playHoverSound}
-                  disabled={isLoadingSuggestion}
-                  className={`
-                    w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200
-                    bg-amber-100 text-amber-600 border border-amber-200 hover:bg-amber-200
-                    ${isLoadingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                  title="Get key points"
-                >
-                  <Lightbulb className="w-6 h-6" />
-                </button>
-             </div>
-          </div>
-        )}
-
-        {flowState === 'RECORDING_VOICE' && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] overflow-hidden">
-             <div className="flex flex-col p-6 border-b border-slate-100">
-                 <h3 className={`${headerClass} mb-6`}><div className="mr-3"><Mic className="w-6 h-6" /></div>Recording your answer</h3>
-                 <div className="w-full bg-white border border-slate-200 rounded-full shadow-sm p-3 flex items-center justify-between">
-                     <button onClick={togglePause} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isPaused ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600 animate-pulse'}`}>
-                        {isPaused ? <Mic className="w-6 h-6" /> : <Pause className="w-6 h-6 fill-current" />}
-                    </button>
-                     <div className="flex-grow mx-4 h-10">{voiceStream && <AudioVisualizer stream={voiceStream} isRecording={!isPaused} />}</div>
-                     <div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div>
-                 </div>
-             </div>
-             <div className="p-6"><button onClick={stopRecordingMedia} className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-[20px] hover:bg-blue-700 transition-colors shadow-md text-lg">Done</button></div>
-          </div>
-        )}
-
-        {(flowState === 'PREVIEW_CAMERA' || flowState === 'RECORDING_CAMERA') && (
-          <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)]">
-             <div className="aspect-[4/3] bg-black relative w-full">
-                <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} />
-                {flowState === 'RECORDING_CAMERA' && (
-                  <div className="absolute top-4 right-4 flex items-center space-x-2 bg-red-600/80 text-white px-3 py-1 rounded-full text-xs font-bold">
-                     <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                     <span>REC {formatTime(recordingDuration)}</span>
-                  </div>
-                )}
-             </div>
-             <div className="p-6">{flowState === 'PREVIEW_CAMERA' ? (<button onClick={() => startRecording('video')} className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-[20px] hover:bg-blue-700 shadow-md text-lg">Start</button>) : (<button onClick={stopRecordingMedia} className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-[20px] hover:bg-blue-700 shadow-md text-lg">Done</button>)}</div>
-          </div>
-        )}
-
-        {flowState === 'TYPING' && (
-           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] flex flex-col min-h-[400px]">
-              <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center select-none">
-                    <h3 className={headerClass}><Keyboard className="w-8 h-8 mr-3" /> Type your answer</h3>
-                 </div>
-              </div>
-              
-              <div className="flex-grow flex flex-col h-full animate-fade-in">
-                <div className="relative flex-grow group">
-                  <textarea 
-                    ref={transcriptRef}
-                    value={transcript} 
-                    onChange={(e) => setTranscript(e.target.value)} 
-                    className={`w-full transition-all duration-300 resize-y border-none focus:ring-0 focus:outline-none text-lg text-black placeholder:text-slate-300 bg-white pr-24 ${isAnswerLarge ? 'min-h-[400px]' : 'min-h-[300px]'}`} 
-                    placeholder="Type your answer here..." 
-                    autoFocus 
-                  />
-                  <div className="absolute bottom-4 right-10 flex items-center">
-                     <button onClick={() => transcriptRef.current?.focus()} className="text-slate-400 hover:text-blue-600 transition-colors" title="Edit">
-                       <Edit2 className="w-4 h-4" />
-                     </button>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-slate-100"><button onClick={() => setFlowState('REVIEW')} className="px-6 py-2 bg-blue-600 text-white rounded-[20px] font-medium hover:bg-blue-700">Done</button></div>
-              </div>
-           </div>
-        )}
-
-        {flowState === 'REVIEW' && (
-           <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_10px_30px_rgba(90,85,120,0.15)] overflow-hidden flex flex-col">
-             {recordedVideoUrl && <div className="aspect-video bg-black w-full"><video src={recordedVideoUrl} controls className="w-full h-full" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} /></div>}
-             
-             <div className="flex flex-col">
-               <div 
-                 className="flex items-center p-6 cursor-pointer select-none group border-b border-slate-100"
-                 onClick={() => setIsAnswerVisible(!isAnswerVisible)}
-               >
-                 <div className="mr-3 text-slate-800 transition-transform duration-200">
-                    {isAnswerVisible ? <ChevronDown className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
-                 </div>
-                 <span className={headerClass}>Your answer</span>
-               </div>
-
-               {/* Collapsible area for transcribed answer and audio */}
-               <div className={`grid transition-all duration-300 ease-in-out ${isAnswerVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden">
-                     {hasUserAnswer ? (
-                        <div className="bg-white">
-                           {recordedAudioUrl && (
-                             <div className="px-6 pt-6">
-                               <div className="w-full bg-white border border-slate-200 rounded-full shadow-sm p-3 flex items-center justify-between">
-                                  <button onClick={handlePlayPause} className="w-10 h-10 rounded-full border-2 border-[#1B6FF3] flex items-center justify-center text-[#1B6FF3] hover:bg-blue-50">
-                                     {playbackIsPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-                                  </button>
-                                  <div className="flex-grow mx-4 h-10"><PlaybackVisualizer isPlaying={playbackIsPlaying} /></div>
-                                  <div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div>
-                               </div>
-                             </div>
-                           )}
-                           
-                           <div className="p-6 relative bg-white">
-                              {isTranscribing ? (
-                                  <div className="flex items-center justify-center py-8 animate-fade-in">
-                                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin mr-3" />
-                                      <span className="text-slate-600 font-medium">Transcribing ...</span>
-                                  </div>
-                              ) : (
-                                  transcript ? (
-                                    <div className="relative group animate-fade-in">
-                                      <textarea 
-                                          ref={transcriptRef}
-                                          value={transcript} 
-                                          onChange={(e) => setTranscript(e.target.value)} 
-                                          className={`w-full transition-all duration-300 resize-y outline-none text-black text-lg leading-relaxed bg-white pr-24 ${isAnswerLarge ? 'min-h-[300px]' : 'min-h-[120px]'}`} 
-                                          placeholder="" 
-                                      />
-                                      {/* Small Pen icon */}
-                                      <div className="absolute bottom-4 right-10 flex items-center">
-                                         <button 
-                                           onClick={() => transcriptRef.current?.focus()} 
-                                           className="text-slate-400 hover:text-blue-600 transition-colors" 
-                                           title="Edit"
-                                         >
-                                           <Edit2 className="w-4 h-4" />
-                                         </button>
-                                      </div>
-                                    </div>
-                                  ) : null
-                              )}
+                 {/* Active Content Contextual to flow state or results */}
+                 
+                 {flowState === 'INPUT_SELECTION' && (
+                    <div className="animate-fade-in">
+                       {!suggestion && !isLoadingSuggestion && (
+                           <div className="py-10 text-center text-slate-400">
+                               <p className="text-sm">Select an answer method above to start.</p>
                            </div>
+                       )}
+                    </div>
+                 )}
+
+                 {flowState === 'RECORDING_VOICE' && (
+                    <div className="animate-fade-in pb-4">
+                       <div className="flex items-center space-x-3 mb-6">
+                          <div className="flex items-center space-x-2 bg-red-50 text-red-600 px-3 py-1.5 rounded-full border border-red-100">
+                              <div className={`w-2 h-2 bg-red-600 rounded-full ${!isPaused ? 'animate-pulse' : ''}`}></div>
+                              <span className="text-xs font-bold tracking-wider uppercase">{isPaused ? 'Paused' : 'Recording'}</span>
+                          </div>
+                       </div>
+                       <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between mb-6">
+                           <button 
+                              onClick={togglePause} 
+                              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90 ${isPaused ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600 animate-pulse'}`}
+                           >
+                              {isPaused ? <Mic className="w-6 h-6" /> : <Pause className="w-6 h-6 fill-current" />}
+                          </button>
+                           <div className="flex-grow mx-4 h-10">{voiceStream && <AudioVisualizer stream={voiceStream} isRecording={!isPaused} />}</div>
+                           <div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div>
+                       </div>
+                       <button 
+                        onClick={stopRecordingMedia} 
+                        className="w-full py-3 bg-[#1B6FF3] text-white font-semibold rounded-xl hover:bg-[#1B6FF3]/90 active:scale-[0.98] transition-all shadow-md text-lg"
+                       >
+                         Done
+                       </button>
+                    </div>
+                 )}
+
+                 {(flowState === 'PREVIEW_CAMERA' || flowState === 'RECORDING_CAMERA') && (
+                    <div className="animate-fade-in pb-4">
+                         <div className="aspect-video bg-black relative w-full rounded-2xl overflow-hidden mb-6 shadow-lg">
+                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} />
+                            {flowState === 'RECORDING_CAMERA' ? (
+                               <div className="absolute top-4 left-4 flex items-center space-x-2 bg-white/90 text-red-600 px-3 py-1.5 rounded-full border border-red-100 shadow-sm backdrop-blur-sm">
+                                  <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+                                  <span className="text-xs font-bold tracking-wider uppercase">Recording</span>
+                               </div>
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white font-medium">
+                                    Ready to record
+                                </div>
+                            )}
+                         </div>
+                         <div className="flex space-x-4">
+                            {flowState === 'PREVIEW_CAMERA' ? (
+                              <button 
+                                onClick={() => startRecording('video')} 
+                                className="flex-1 py-3 bg-[#1B6FF3] text-white font-semibold rounded-xl hover:bg-[#1B6FF3]/90 active:scale-[0.98] transition-all shadow-md text-lg"
+                              >
+                                Start recording
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={stopRecordingMedia} 
+                                className="flex-1 py-3 bg-[#1B6FF3] text-white font-semibold rounded-xl hover:bg-[#1B6FF3]/90 active:scale-[0.98] transition-all shadow-md text-lg"
+                              >
+                                Done
+                              </button>
+                            )}
+                         </div>
+                    </div>
+                 )}
+
+                 {flowState === 'TYPING' && (
+                    <div className="animate-fade-in pb-4">
+                       <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-slate-800 flex items-center"><Keyboard className="w-5 h-5 mr-2 text-[#1B6FF3]" /> Type your answer</h3>
+                       </div>
+                       
+                       <div className="relative group mb-6">
+                         <textarea 
+                           ref={transcriptRef}
+                           value={transcript} 
+                           onChange={(e) => setTranscript(e.target.value)} 
+                           className="w-full transition-all duration-300 resize-y border border-slate-200 rounded-2xl p-6 focus:ring-2 focus:ring-[#1B6FF3]/20 focus:border-[#1B6FF3] focus:outline-none text-lg text-black placeholder:text-slate-300 bg-slate-50 min-h-[250px]" 
+                           placeholder="Type your answer here..." 
+                           autoFocus 
+                         />
+                         <div className="absolute bottom-4 right-4 flex items-center">
+                            <button onClick={() => transcriptRef.current?.focus()} className="p-2 text-slate-400 hover:text-[#1B6FF3] transition-colors" title="Edit">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                         </div>
+                       </div>
+                       <button 
+                        onClick={() => setFlowState('REVIEW')} 
+                        className="w-full py-3 bg-[#1B6FF3] text-white font-semibold rounded-xl hover:bg-[#1B6FF3]/90 active:scale-[0.98] transition-all shadow-md text-lg"
+                       >
+                         Done
+                       </button>
+                    </div>
+                 )}
+
+                 {flowState === 'REVIEW' && (
+                    <div className="animate-fade-in space-y-6">
+                        {recordedVideoUrl && (
+                            <div className="aspect-video bg-black w-full rounded-2xl overflow-hidden shadow-lg border border-slate-200 bg-slate-900">
+                                <video src={recordedVideoUrl} controls className="w-full h-full" style={{ filter: 'brightness(1.05) contrast(1.02) saturate(1.05) blur(0.3px)' }} />
+                            </div>
+                        )}
+
+                        {recordedAudioUrl && (
+                           <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                              <button onClick={handlePlayPause} className="w-12 h-12 rounded-full border-2 border-[#1B6FF3] flex items-center justify-center text-[#1B6FF3] hover:bg-[#1B6FF3]/10 active:scale-90 transition-all">
+                                 {playbackIsPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
+                              </button>
+                              <div className="flex-grow mx-4 h-10"><PlaybackVisualizer isPlaying={playbackIsPlaying} /></div>
+                              <div className="text-slate-900 font-mono font-medium min-w-[3rem] text-right">{formatTime(recordingDuration)}</div>
+                           </div>
+                        )}
+                        
+                        <div className="relative group">
+                           {isTranscribing ? (
+                               <div className="flex items-center justify-center py-10 bg-slate-50 rounded-2xl border border-slate-200 animate-pulse">
+                                   <Loader2 className="w-8 h-8 text-[#1B6FF3] animate-spin mr-3" />
+                                   <span className="text-slate-600 font-medium">Transcribing your answer...</span>
+                               </div>
+                           ) : (
+                               transcript ? (
+                                 <div className="relative">
+                                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Transcribed text</h4>
+                                   <textarea 
+                                       ref={transcriptRef}
+                                       value={transcript} 
+                                       onChange={(e) => setTranscript(e.target.value)} 
+                                       className="w-full transition-all duration-300 resize-y border border-slate-200 rounded-2xl p-6 focus:ring-2 focus:ring-[#1B6FF3]/20 focus:border-[#1B6FF3] focus:outline-none text-lg leading-relaxed text-black bg-slate-50 min-h-[150px]" 
+                                       placeholder="" 
+                                   />
+                                   <div className="absolute top-8 right-4">
+                                      <button 
+                                        onClick={() => transcriptRef.current?.focus()} 
+                                        className="p-2 text-slate-400 hover:text-[#1B6FF3] transition-colors" 
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+                                   </div>
+                                 </div>
+                               ) : null
+                           )}
                         </div>
-                     ) : null}
-                  </div>
+                    </div>
+                 )}
+
+               </div>
+               
+               <div className="mt-6 flex items-center justify-end">
+                  <button 
+                    onClick={() => {
+                      if (!suggestion) {
+                        handleGetSuggestion();
+                      } else {
+                        setIsGuideVisible(!isGuideVisible);
+                      }
+                    }}
+                    onMouseEnter={playHoverSound}
+                    disabled={isLoadingSuggestion}
+                    className={`
+                      px-4 py-2 rounded-xl flex items-center justify-center transition-all duration-200
+                      bg-amber-100 text-amber-600 border border-amber-200 hover:bg-amber-200 active:scale-95
+                      ${isLoadingSuggestion ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                    title="How to Answer"
+                  >
+                    <Lightbulb className="w-5 h-5 mr-2" />
+                    <span className="text-sm font-semibold">How to Answer</span>
+                  </button>
                </div>
              </div>
-
-             {/* Redo section stays visible at all times */}
-             <div className="p-6 bg-white border-t border-slate-100">
-                <h3 className="text-xl font-medium text-slate-800 mb-4">Redo</h3>
-                <div className="flex space-x-4">
-                   <ActionButton icon={Mic} onClick={() => handleRedoRequest('VOICE')} title="Voice Redo" />
-                   <ActionButton icon={Video} onClick={() => handleRedoRequest('CAMERA')} title="Camera Redo" />
-                   <ActionButton icon={Keyboard} onClick={() => handleRedoRequest('TYPE')} title="Type Redo" />
-                </div>
-             </div>
-           </div>
+          </div>
         )}
       </div>
 

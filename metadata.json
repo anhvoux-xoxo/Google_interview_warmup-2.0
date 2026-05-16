@@ -1,8 +1,11 @@
 {
   "name": "Interview_warmup 2.0",
-  "description": "Redesign and Updated more functions for Google Warmup tool",
+  "description": "An AI-powered interview practice tool with real-time feedback and speech-to-text.",
   "requestFramePermissions": [
     "camera",
     "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }

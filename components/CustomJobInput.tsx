@@ -44,7 +44,7 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
           onMouseEnter={playHoverSound}
           onClick={handleStart}
           disabled={!description.trim() || isGenerating}
-          className="w-full max-w-md py-4 px-8 bg-blue-600 text-white text-xl font-medium rounded-[20px] hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center disabled:opacity-70"
+          className="w-full max-w-md py-4 px-8 bg-[#1B6FF3] text-white text-xl font-medium rounded-[20px] hover:bg-[#1B6FF3]/90 transition-all active:scale-[0.98] shadow-sm flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {isGenerating ? (
             <>
@@ -64,7 +64,7 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
         <button
           onMouseEnter={playHoverSound}
           onClick={onManualAdd}
-          className="px-8 py-3 text-slate-900 font-bold text-lg transition-all rounded-full hover:text-[#2563EB] hover:bg-white border-0 bg-transparent active:scale-95"
+          className="px-8 py-3 text-slate-800 font-bold text-lg transition-all rounded-full hover:text-[#1B6FF3] hover:bg-white border-0 bg-transparent active:scale-95"
         >
           Manually add your questions here
         </button>

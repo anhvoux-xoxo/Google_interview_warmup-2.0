@@ -37,15 +37,15 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
               onMouseEnter={playHoverSound}
               onClick={() => setActiveFilter(filter)}
               className={`
-                px-5 py-2 rounded-full text-sm font-medium transition-colors border flex items-center
+                px-5 py-2 rounded-full text-sm font-medium transition-all border flex items-center active:scale-95
                 ${isActive
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-[0_4px_12px_rgba(37,99,235,0.3)]' 
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-600'}
+                  ? 'bg-[#1B6FF3] text-white border-[#1B6FF3] shadow-[0_4px_12px_rgba(27,111,243,0.3)]' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-[#1B6FF3]/30 hover:text-[#1B6FF3]'}
               `}
             >
               {filter} 
               {filter === 'All' && (
-                  <span className={`ml-2 px-1.5 py-0.5 rounded-full text-sm font-bold ${isActive ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`ml-2 px-1.5 py-0.5 rounded-full text-sm font-bold ${isActive ? 'bg-white text-[#1B6FF3]' : 'bg-slate-100 text-slate-600'}`}>
                       {questions.length}
                   </span>
               )}

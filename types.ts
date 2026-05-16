@@ -10,10 +10,9 @@ export enum View {
 }
 
 export enum QuestionCategory {
+  GENERAL = 'General',
   UX_DESIGN = 'UX Design',
   ENGINEERING = 'Engineering',
-  DATA_ANALYTICS = 'Data Analytics',
-  CYBERSECURITY = 'Cybersecurity',
   CUSTOM = 'Custom Practice',
 }
 

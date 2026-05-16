@@ -24,7 +24,7 @@ export const PracticeStart: React.FC<PracticeStartProps> = ({
         <button 
           onMouseEnter={playHoverSound}
           onClick={onStartPractice}
-          className="w-full max-w-xs py-4 px-8 bg-[#2563EB] text-white text-xl font-semibold rounded-[20px] hover:bg-blue-700 transition-all flex items-center justify-center group active:scale-[0.98] shadow-lg shadow-blue-600/5"
+          className="w-full max-w-xs py-4 px-8 bg-[#1B6FF3] text-white text-xl font-semibold rounded-[20px] hover:bg-[#1B6FF3]/90 transition-all flex items-center justify-center group active:scale-[0.98] shadow-lg shadow-blue-600/5"
         >
           Start
           <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-1 transition-transform" />
@@ -36,7 +36,7 @@ export const PracticeStart: React.FC<PracticeStartProps> = ({
           <button 
             onMouseEnter={playHoverSound}
             onClick={onSeeAllQuestions}
-            className="px-8 py-3 text-slate-900 font-bold text-lg transition-all rounded-full hover:text-[#2563EB] hover:bg-white border-0 bg-transparent active:scale-95"
+            className="px-8 py-3 text-slate-800 font-bold text-lg transition-all rounded-full hover:text-[#1B6FF3] hover:bg-white border-0 bg-transparent active:scale-95"
           >
             {isCustom ? "See all the generated questions" : "See all the questions"}
           </button>

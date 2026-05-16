@@ -71,7 +71,7 @@ export const CustomQuestionInput: React.FC<CustomQuestionInputProps> = ({ onAdd 
           onMouseEnter={playHoverSound}
           onClick={() => onAdd(questionText, answerText)}
           disabled={!questionText.trim()}
-          className="px-10 py-3 bg-blue-600 text-white font-semibold rounded-[20px] hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_12px_rgba(37,99,235,0.3)] hover:shadow-lg active:scale-95"
+          className="px-10 py-3 bg-[#1B6FF3] text-white font-semibold rounded-[20px] hover:bg-[#1B6FF3]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_12px_rgba(27,111,243,0.3)] hover:shadow-lg active:scale-95"
         >
           Add
         </button>

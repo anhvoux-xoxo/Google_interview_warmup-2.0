@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Search, Mic, Zap, Sparkles } from 'lucide-react';
+import { ArrowRight, Search, Mic, Zap } from 'lucide-react';
 import { playHoverSound } from '../utils/sound';
 
 interface OnboardingProps {
@@ -31,19 +31,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onStart }) => {
   return (
     <div className="relative min-h-[calc(100vh-80px)] overflow-hidden flex flex-col items-center justify-center bg-[#f8fafc] py-12">
       <div className="relative z-10 w-full max-w-5xl px-8 lg:px-12 flex flex-col items-center">
-        {/* Modern Badge */}
-        <div className="inline-flex items-center space-x-2 px-4 py-1.5 mb-6 rounded-full bg-white border border-slate-200 shadow-sm animate-fade-in-up">
-          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest font-sans">AI-Powered Interview Coach</span>
-        </div>
-
         {/* Hero Branding */}
         <div className="text-center mb-10 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <h1 className="text-5xl md:text-7xl font-bold text-slate-900 tracking-tight leading-tight mb-6 font-serif">
             Simple<span className="text-[#1B6FF3]">Prep.</span>
           </h1>
           <p className="text-lg md:text-xl text-slate-500 max-w-xl mx-auto leading-relaxed font-normal font-sans">
-            Ready for your next interview? Practice real-world questions and boost your confidence.
+            Get ready for your next interview. Practice real-world questions and boost your confidence.
           </p>
         </div>
 
@@ -52,7 +46,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onStart }) => {
           <button 
             onMouseEnter={playHoverSound}
             onClick={onStart}
-            className="group relative px-10 py-4 bg-[#1B6FF3] text-white text-lg font-semibold rounded-2xl hover:bg-blue-600 transition-all shadow-md active:scale-95 flex items-center font-sans"
+            className="group relative px-10 py-4 bg-[#1B6FF3] text-white text-lg font-semibold rounded-2xl hover:bg-[#1B6FF3]/90 transition-all shadow-md active:scale-95 flex items-center font-sans"
           >
             Start now
             <ArrowRight className="ml-2.5 w-5 h-5 group-hover:translate-x-1 transition-transform" />

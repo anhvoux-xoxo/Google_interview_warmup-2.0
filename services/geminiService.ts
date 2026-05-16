@@ -1,26 +1,39 @@
 
-import { GoogleGenAI, Modality, Type } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const transcribeAudio = async (base64Audio: string, mimeType: string): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: [
-        {
-          inlineData: {
-            mimeType: mimeType,
-            data: base64Audio
-          }
-        },
-        {
-          text: "Transcribe this interview answer exactly as spoken. Do not add any feedback, just the text. If the audio is silent, return an empty string."
-        }
-      ],
+    const response = await fetch("/api/gemini/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64Audio, mimeType }),
     });
+    const data = await response.json();
+    const transcript = data.text?.trim() || "";
+    
+    // Clean up as before
+    let cleaned = transcript
+      .replace(/\[\[EMPTY_AUDIO\]\]/g, '')
+      .replace(/\[.*?\]/g, '')
+      .replace(/\(.*\)/g, '')
+      .trim();
 
-    return response.text?.trim() || "";
+    const low = cleaned.toLowerCase();
+    const thirdPersonHallucinations = [
+        "he's really trying", "doing a really good job", "impressed with him", 
+        "yeah he is", "very impressed", "good job he", "he is doing",
+        "she's really", "doing a good job", "impressed with her",
+        "trying and doing", "is really trying", "doing a good", 
+        "he is doing", "she is doing", "job he", "job she"
+    ];
+
+    if (thirdPersonHallucinations.some(h => low.includes(h))) {
+        if (cleaned.split(' ').length < 25) return "";
+    }
+
+    if (low.includes("watching") && (low.includes("thank") || low.includes("please"))) {
+        if (cleaned.split(' ').length < 15) return "";
+    }
+      
+    return cleaned;
   } catch (error) {
     console.error("Transcription Error:", error);
     return "";
@@ -29,29 +42,13 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
 
 export const getAiSuggestion = async (question: string): Promise<string> => {
   try {
-    const prompt = `
-      You are an expert interview coach. 
-      The user is practicing for a job interview.
-      
-      Question: "${question}"
-      
-      Please provide a concise, structured "Ideal Answer" or a set of key "Talking Points" that the user should cover in their response. 
-      
-      STRICT FORMATTING RULES:
-      - Use ONLY plain text.
-      - DO NOT use any Markdown symbols like asterisks (*), hashes (#), or underscores (_).
-      - For lists, use the bullet point symbol (•) at the start of the line.
-      - Use double line breaks to separate paragraphs.
-      - Keep the tone professional and encouraging. 
-      - Limit the response to around 150 words.
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
+    const response = await fetch("/api/gemini/suggestion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
     });
-
-    return response.text || "Sorry, I couldn't generate a suggestion at this time.";
+    const data = await response.json();
+    return data.text || "Sorry, I couldn't generate a suggestion at this time.";
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "Unable to connect to AI service. Please try again later.";
@@ -60,37 +57,12 @@ export const getAiSuggestion = async (question: string): Promise<string> => {
 
 export const generateQuestions = async (jobDescription: string): Promise<{text: string, type: string}[]> => {
   try {
-    const prompt = `
-      Based on the following job description, generate exactly 5 interview questions.
-      Categorize each question as either 'Background', 'Situational', or 'Technical'.
-      Return ONLY a JSON array of objects with "text" and "type" keys.
-      
-      Job Description: "${jobDescription}"
-    `;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              text: { type: Type.STRING },
-              type: { type: Type.STRING, description: "One of: Background, Situational, Technical" }
-            },
-            required: ["text", "type"]
-          }
-        }
-      }
+    const response = await fetch("/api/gemini/generate-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobDescription }),
     });
-
-    const text = response.text;
-    if (!text) return [];
-    
-    const questions = JSON.parse(text);
+    const questions = await response.json();
     return Array.isArray(questions) ? questions : [];
   } catch (error) {
     console.error("Gemini API Error:", error);
@@ -106,20 +78,13 @@ export const generateQuestions = async (jobDescription: string): Promise<{text: 
 
 export const generateSpeech = async (text: string): Promise<Uint8Array | null> => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
-        },
-      },
+    const response = await fetch("/api/gemini/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
     });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    const resData = await response.json();
+    const base64Audio = resData.data;
     if (!base64Audio) return null;
 
     const binaryString = atob(base64Audio);
@@ -133,4 +98,74 @@ export const generateSpeech = async (text: string): Promise<Uint8Array | null> =
     console.error("Gemini TTS Error:", error);
     return null;
   }
+};
+
+export async function decodePCM(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number = 24000,
+  numChannels: number = 1
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+export class GlobalAudio {
+  private static context: AudioContext | null = null;
+  private static currentSource: AudioBufferSourceNode | null = null;
+
+  static init() {
+    if (!this.context) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      this.context = new AudioContextClass({ sampleRate: 24000 });
+    }
+    if (this.context.state === 'suspended') {
+      this.context.resume();
+    }
+    return this.context;
+  }
+
+  static stop() {
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop();
+      } catch (e) {}
+      this.currentSource = null;
+    }
+  }
+
+  static async playSpeech(audioPromise: Promise<AudioBuffer | null>, onEnded?: () => void) {
+    this.stop();
+    const ctx = this.init();
+    const buffer = await audioPromise;
+    if (!buffer) return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.onended = () => {
+      if (this.currentSource === source) {
+        this.currentSource = null;
+        onEnded?.();
+      }
+    };
+    this.currentSource = source;
+    source.start(0);
+  }
+}
+
+export const prefetchSpeech = async (text: string): Promise<AudioBuffer | null> => {
+  const pcmData = await generateSpeech(text);
+  if (!pcmData) return null;
+  const ctx = GlobalAudio.init();
+  return decodePCM(pcmData, ctx);
 };
