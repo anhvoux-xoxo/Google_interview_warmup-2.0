@@ -26,30 +26,31 @@ export const Home: React.FC<HomeProps> = ({ onStart }) => {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
           <button 
             onClick={onStart}
+            aria-label="Start practicing interview warmup questions"
             className="px-8 py-4 bg-blue-600 text-white rounded-full text-lg font-semibold shadow-lg hover:bg-blue-700 hover:shadow-xl transition-all flex items-center group"
           >
             Start Practicing
-            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left mt-12">
            <div className="p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-sm">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-blue-600">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-blue-600" aria-hidden="true">
                 <CheckCircle className="w-6 h-6" />
               </div>
               <h3 className="font-semibold text-lg mb-2">Real Questions</h3>
               <p className="text-slate-500">Practice with questions curated by industry experts from top companies.</p>
            </div>
            <div className="p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-sm">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-4 text-purple-600">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-4 text-purple-600" aria-hidden="true">
                 <CheckCircle className="w-6 h-6" />
               </div>
               <h3 className="font-semibold text-lg mb-2">AI Insights</h3>
               <p className="text-slate-500">Receive instant feedback and improvement suggestions powered by Gemini.</p>
            </div>
            <div className="p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-sm">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600" aria-hidden="true">
                 <CheckCircle className="w-6 h-6" />
               </div>
               <h3 className="font-semibold text-lg mb-2">Record & Review</h3>

@@ -46,10 +46,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onStart }) => {
           <button 
             onMouseEnter={playHoverSound}
             onClick={onStart}
+            aria-label="Start interview preparation training"
             className="group relative px-10 py-4 bg-[#1B6FF3] text-white text-lg font-semibold rounded-2xl hover:bg-[#1B6FF3]/90 transition-all shadow-md active:scale-95 flex items-center font-sans"
           >
             Start now
-            <ArrowRight className="ml-2.5 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="ml-2.5 w-5 h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
           </button>
         </div>
 

@@ -36,6 +36,8 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
               key={filter}
               onMouseEnter={playHoverSound}
               onClick={() => setActiveFilter(filter)}
+              aria-pressed={isActive}
+              aria-label={filter === 'All' ? `Show all ${questions.length} questions` : `Filter by ${filter} questions`}
               className={`
                 px-5 py-2 rounded-full text-sm font-medium transition-all border flex items-center active:scale-95
                 ${isActive
@@ -60,16 +62,25 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
             key={q.id}
             onMouseEnter={playHoverSound}
             onClick={() => onSelectQuestion(q)}
+            tabIndex={0}
+            role="button"
+            aria-label={`Question category: ${q.type}. Question text: ${q.text}. Click to begin practicing.`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectQuestion(q);
+              }
+            }}
             className="group cursor-pointer bg-white p-6 rounded-2xl border border-transparent shadow-[0_10px_30px_rgba(90,85,120,0.15)] hover:shadow-[0_16px_40px_rgba(165,155,250,0.22)] hover:border-blue-100 transition-all h-full min-h-[160px] flex flex-col items-start"
           >
             <span className={`
-              inline-flex items-center px-2 py-1 rounded-md text-xs font-medium mb-4
-              ${q.type === 'Background' ? 'bg-purple-100 text-purple-700' : 
-                q.type === 'Technical' ? 'bg-emerald-100 text-emerald-700' : 
-                q.type === 'Situational' ? 'bg-pink-100 text-pink-700' :
-                'bg-yellow-100 text-yellow-800'}
+               inline-flex items-center px-2 py-1 rounded-md text-xs font-medium mb-4
+               ${q.type === 'Background' ? 'bg-purple-100 text-purple-700' : 
+                 q.type === 'Technical' ? 'bg-emerald-100 text-emerald-700' : 
+                 q.type === 'Situational' ? 'bg-pink-100 text-pink-700' :
+                 'bg-yellow-100 text-yellow-800'}
             `}>
-              <Info className="w-3 h-3 mr-1" />
+              <Info className="w-3 h-3 mr-1" aria-hidden="true" />
               {q.type === 'Custom question' ? 'Custom' : q.type}
             </span>
             <h3 className="text-lg font-medium text-slate-800 leading-snug group-hover:text-blue-700 transition-colors">
@@ -83,10 +94,11 @@ export const Practice: React.FC<PracticeProps> = ({ category, questions, onSelec
           <button 
             onMouseEnter={playHoverSound}
             onClick={onAddCustomQuestion}
+            aria-label="Add custom question"
             className="group cursor-pointer bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 hover:border-blue-400 hover:bg-blue-100 transition-all h-full min-h-[160px] flex flex-col items-center justify-center text-blue-600"
           >
             <div className="flex items-center">
-              <Plus className="w-6 h-6 mr-2" />
+              <Plus className="w-6 h-6 mr-2" aria-hidden="true" />
               <span className="font-semibold text-lg">Add custom question</span>
             </div>
           </button>

@@ -4,6 +4,9 @@ let isSoundEnabled = true;
 
 export const toggleSoundEnabled = () => {
   isSoundEnabled = !isSoundEnabled;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sound-toggle', { detail: { enabled: isSoundEnabled } }));
+  }
   return isSoundEnabled;
 };
 

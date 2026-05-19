@@ -58,25 +58,40 @@ async function startServer() {
         
         Question: "${question}"
         
-        Please provide a concise, structured "Ideal Answer" or a set of key "Talking Points" that the user should cover in their response. 
-        
-        STRICT FORMATTING RULES:
-        - Use ONLY plain text.
-        - DO NOT use any Markdown symbols like asterisks (*), hashes (#), or underscores (_).
-        - For lists, use the bullet point symbol (•) at the start of the line.
-        - Use double line breaks to separate paragraphs.
-        - Keep the tone professional and encouraging. 
-        - Limit the response to around 150 words.
+        Provide exactly 3 actionable Talking Points and exactly 5-6 scannable Keywords (such as prominent action verbs or technical terms relevant to the question) that the candidate should mention in their answer to ensure structure and clarity.
       `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
         generationConfig: {
-          temperature: 1,
+          temperature: 0.2,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              talkingPoints: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "3 concise actionable talking points or focus questions to answer."
+              },
+              keywords: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "5-6 scannable vocabulary words or key action verbs to help structure the answer."
+              }
+            },
+            required: ["talkingPoints", "keywords"]
+          }
         }
       });
-      res.json({ text: response.text });
+      let cleanText = response.text || "{}";
+      const firstCurly = cleanText.indexOf('{');
+      const lastCurly = cleanText.lastIndexOf('}');
+      if (firstCurly !== -1 && lastCurly !== -1) {
+        cleanText = cleanText.substring(firstCurly, lastCurly + 1);
+      }
+      res.json(JSON.parse(cleanText));
     } catch (error) {
       console.error("Suggestion error:", error);
       res.status(500).json({ error: "Failed to get suggestion" });

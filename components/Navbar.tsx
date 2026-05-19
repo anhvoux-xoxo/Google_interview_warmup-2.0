@@ -32,6 +32,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span 
                 className="text-3xl font-bold text-slate-900 font-serif tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={onHome}
+                tabIndex={0}
+                role="button"
+                aria-label="SimplePrep logo. Click to go to home page."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onHome();
+                  }
+                }}
               >
                 Simple<span className="text-[#1B6FF3]">Prep.</span>
               </span>
@@ -50,8 +59,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onHome}
             onMouseEnter={playHoverSound}
             className={navButtonClass}
+            aria-label="Go to home"
           >
-            <HomeIcon className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+            <HomeIcon className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" aria-hidden="true" />
             <span className="text-xs font-semibold font-sans">Home</span>
           </button>
 
@@ -59,11 +69,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={toggleSound}
             onMouseEnter={playHoverSound}
             className={navButtonClass}
+            aria-label={isSoundOn ? "Interactive sound enabled. Click to mute sound effects" : "Interactive sound muted. Click to enable sound effects"}
+            aria-pressed={isSoundOn}
           >
             {isSoundOn ? (
-              <Volume2 className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+              <Volume2 className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" aria-hidden="true" />
             ) : (
-              <VolumeX className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+              <VolumeX className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" aria-hidden="true" />
             )}
             <span className="text-xs font-semibold font-sans">Sound</span>
           </button>

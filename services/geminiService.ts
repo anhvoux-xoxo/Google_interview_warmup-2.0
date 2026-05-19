@@ -40,18 +40,38 @@ export const transcribeAudio = async (base64Audio: string, mimeType: string): Pr
   }
 };
 
-export const getAiSuggestion = async (question: string): Promise<string> => {
+export interface SuggestionData {
+  talkingPoints: string[];
+  keywords: string[];
+}
+
+export const getAiSuggestion = async (question: string): Promise<SuggestionData> => {
   try {
     const response = await fetch("/api/gemini/suggestion", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
     const data = await response.json();
-    return data.text || "Sorry, I couldn't generate a suggestion at this time.";
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    return {
+      talkingPoints: Array.isArray(data.talkingPoints) ? data.talkingPoints : [],
+      keywords: Array.isArray(data.keywords) ? data.keywords : []
+    };
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Unable to connect to AI service. Please try again later.";
+    return {
+      talkingPoints: [
+        "Structure your response with clear, measurable achievements.",
+        "Demonstrate standard individual actions and tech decisions."
+      ],
+      keywords: ["architected", "optimized", "spearheaded", "consequently"]
+    };
   }
 };
 

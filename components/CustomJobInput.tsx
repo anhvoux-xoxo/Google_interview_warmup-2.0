@@ -33,8 +33,10 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
         </h2>
         
         <textarea
+          id="job-desc-textarea"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          aria-label="Paste or type job description to generate practice questions"
           className="w-full h-48 p-4 bg-white border border-slate-200 rounded-xl resize-none focus:outline-none focus:border-slate-400 text-slate-700 placeholder:text-slate-400 mb-8"
           placeholder="e.g. UX Designer role at Google..."
         />
@@ -43,18 +45,19 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
         <button 
           onMouseEnter={playHoverSound}
           onClick={handleStart}
+          aria-label={isGenerating ? "Generating questions. Please wait." : "Generate questions from description and start practice"}
           disabled={!description.trim() || isGenerating}
           className="w-full max-w-md py-4 px-8 bg-[#1B6FF3] text-white text-xl font-medium rounded-[20px] hover:bg-[#1B6FF3]/90 transition-all active:scale-[0.98] shadow-sm flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {isGenerating ? (
             <>
-              <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+              <Loader2 className="w-6 h-6 mr-2 animate-spin" aria-hidden="true" />
               Generating...
             </>
           ) : (
             <>
               Start
-              <ArrowRight className="w-6 h-6 ml-2" />
+              <ArrowRight className="w-6 h-6 ml-2" aria-hidden="true" />
             </>
           )}
         </button>
@@ -64,6 +67,7 @@ export const CustomJobInput: React.FC<CustomJobInputProps> = ({ onStart, onManua
         <button
           onMouseEnter={playHoverSound}
           onClick={onManualAdd}
+          aria-label="Manually add custom questions"
           className="px-8 py-3 text-slate-800 font-bold text-lg transition-all rounded-full hover:text-[#1B6FF3] hover:bg-white border-0 bg-transparent active:scale-95"
         >
           Manually add your questions here

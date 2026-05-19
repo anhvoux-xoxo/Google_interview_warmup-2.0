@@ -65,7 +65,7 @@ export default function App() {
   const isInSession = currentView === View.QUESTION_FLOW && sessionQuestions.length > 0;
   
   const canGoBack = isInSession 
-    ? currentSessionIndex > 0 
+    ? (currentSessionIndex > 0 || currentViewIndex > 0) 
     : currentViewIndex > 0;
     
   const canGoForward = isInSession 
@@ -221,13 +221,15 @@ export default function App() {
             onNext={handleNextInSession}
             onPrev={handlePrevInSession}
             preFetchedAudioPromise={pendingAudioPromise}
+            allQuestions={questions[selectedCategory!] || []}
+            onSelectQuestion={handleSelectQuestion}
           />
         );
       default: return <div>Unknown View</div>;
     }
   };
 
-  const navIconClass = "fixed top-1/2 -translate-y-1/2 z-40 w-16 h-16 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-xl text-slate-700 hover:text-[#1B6FF3] hover:bg-slate-50 transition-all hover:scale-110 active:scale-95 group disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:text-slate-700";
+  const navIconClass = "fixed top-1/2 -translate-y-1/2 z-40 w-12 h-12 flex items-center justify-center rounded-full bg-white border border-slate-200 shadow-xl text-slate-700 hover:text-[#1B6FF3] hover:bg-slate-50 transition-all hover:scale-110 active:scale-95 group disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:text-slate-700";
 
   return (
     <div className="min-h-screen text-slate-900 flex flex-col relative bg-[#f8fafc] font-sans">
@@ -247,7 +249,7 @@ export default function App() {
             className={`${navIconClass} left-8 lg:left-12`}
             title="Go Back"
           >
-            <ArrowLeft className="w-7 h-7 group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
           </button>
         )}
 
@@ -263,7 +265,7 @@ export default function App() {
             className={`${navIconClass} right-8 lg:right-12`}
             title="Go Forward"
           >
-            <ArrowRight className="w-7 h-7 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         )}
       </div>

@@ -94,8 +94,15 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
 
   const handleGetAiSuggestion = async () => {
     setLoadingAi(true);
-    const suggestion = await getAiSuggestion(question.text);
-    setAiSuggestion(suggestion);
+    const res = await getAiSuggestion(question.text);
+    const formatted = [
+      "SUGGESTED TALKING POINTS:",
+      ...res.talkingPoints.map((p: string) => `• ${p}`),
+      "",
+      "RECOMMENDED KEYWORDS:",
+      res.keywords.join(", ")
+    ].join("\n");
+    setAiSuggestion(formatted);
     setLoadingAi(false);
   };
 
@@ -128,8 +135,8 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
               {question.type} question
             </span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <X className="w-6 h-6 text-slate-400" />
+          <button onClick={onClose} aria-label="Close question modal" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <X className="w-6 h-6 text-slate-400" aria-hidden="true" />
           </button>
         </div>
 
@@ -196,42 +203,50 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
              <div className="flex justify-center space-x-4">
                 <button 
                   onClick={() => setMode('camera')}
+                  aria-pressed={mode === 'camera'}
+                  aria-label="Switch mode to Camera recording"
                   className={`p-3 rounded-full transition-all ${mode === 'camera' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
                   title="Camera"
                 >
-                  <Video className="w-5 h-5" />
+                  <Video className="w-5 h-5" aria-hidden="true" />
                 </button>
                 <button 
                   onClick={() => setMode('voice')}
+                  aria-pressed={mode === 'voice'}
+                  aria-label="Switch mode to Voice-only recording"
                   className={`p-3 rounded-full transition-all ${mode === 'voice' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
                   title="Voice Only"
                 >
-                  <Mic className="w-5 h-5" />
+                  <Mic className="w-5 h-5" aria-hidden="true" />
                 </button>
                 <button 
                   onClick={() => setMode('text')}
+                  aria-pressed={mode === 'text'}
+                  aria-label="Switch mode to Text entry typing"
                   className={`p-3 rounded-full transition-all ${mode === 'text' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
                   title="Type Answer"
                 >
-                  <Keyboard className="w-5 h-5" />
+                  <Keyboard className="w-5 h-5" aria-hidden="true" />
                 </button>
                 <button 
                   onClick={() => setMode('ai')}
+                  aria-pressed={mode === 'ai'}
+                  aria-label="Switch mode to view AI suggestion guidance"
                   className={`p-3 rounded-full transition-all ${mode === 'ai' ? 'bg-amber-400 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
                   title="AI Hints"
                 >
-                  <Lightbulb className="w-5 h-5" />
+                  <Lightbulb className="w-5 h-5" aria-hidden="true" />
                 </button>
              </div>
-          </div>
-
-          {/* Right Panel: Transcription/Answer */}
+          </div>          {/* Right Panel: Transcription/Answer */}
           <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col bg-white">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-700">Your Answer</h3>
               {mode !== 'text' && mode !== 'ai' && (
                  <button 
                    onClick={toggleRecording}
+                   aria-pressed={isRecording}
+                   aria-label={isRecording ? "Stop current answer recording" : "Start answer recording"}
                    className={`
                      flex items-center px-4 py-2 rounded-full text-sm font-semibold transition-all
                      ${isRecording 
@@ -239,7 +254,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md'}
                    `}
                  >
-                   {isRecording ? <StopCircle className="w-4 h-4 mr-2" /> : <PlayCircle className="w-4 h-4 mr-2" />}
+                   {isRecording ? <StopCircle className="w-4 h-4 mr-2" aria-hidden="true" /> : <PlayCircle className="w-4 h-4 mr-2" aria-hidden="true" />}
                    {isRecording ? 'Stop Recording' : 'Start Recording'}
                  </button>
               )}
@@ -249,6 +264,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
                <textarea
                  value={transcript}
                  onChange={(e) => setTranscript(e.target.value)}
+                 aria-label="Your transcribed or typed answer text"
                  placeholder={mode === 'text' ? "Type your answer here..." : "Transcription will appear here after recording..."}
                  className="w-full h-full bg-transparent border-none resize-none focus:ring-0 text-slate-700 leading-relaxed placeholder:text-slate-400"
                />
@@ -263,14 +279,15 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
                <div className="flex space-x-3">
                   <button 
                     onClick={() => setTranscript('')}
+                    aria-label="Clear answer and redo"
                     className="flex items-center px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors text-sm font-medium"
                   >
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                    <RotateCcw className="w-4 h-4 mr-2" aria-hidden="true" />
                     Redo
                   </button>
                   {transcript && (
-                    <button className="flex items-center px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors text-sm font-medium">
-                      <PlayCircle className="w-4 h-4 mr-2" />
+                    <button aria-label="Replay current answer recording" className="flex items-center px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors text-sm font-medium">
+                      <PlayCircle className="w-4 h-4 mr-2" aria-hidden="true" />
                       Replay
                     </button>
                   )}
@@ -279,9 +296,10 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({ question, onClose,
                <button 
                  onClick={handleSave}
                  disabled={!transcript}
+                 aria-label="Save current answer and complete question"
                  className="flex items-center px-6 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                >
-                 <Save className="w-4 h-4 mr-2" />
+                 <Save className="w-4 h-4 mr-2" aria-hidden="true" />
                  Save Answer
                </button>
             </div>

@@ -25,6 +25,8 @@ export const FieldSelection: React.FC<FieldSelectionProps> = ({
             key={cat}
             onMouseEnter={playHoverSound}
             onClick={() => onSelectCategory(cat)}
+            aria-pressed={selectedCategory === cat}
+            aria-label={`Select ${cat} path`}
             className={`
               w-full text-left p-6 rounded-2xl border-2 transition-all duration-200 transform active:scale-[0.99]
               ${selectedCategory === cat 
